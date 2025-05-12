@@ -48,3 +48,7 @@ rel: $(REBAR)
 .PHONY: fmt
 fmt: $(REBAR)
 	$(REBAR) fmt --verbose -w
+
+.PHONY: run
+run: rel
+	./run.sh
