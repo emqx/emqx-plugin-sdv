@@ -41,11 +41,5 @@ create_tables() ->
         {record_name, ?DATA_REC},
         {attributes, record_info(fields, ?DATA_REC)}
     ]),
-    ok = mria:create_table(?ID_TAB, [
-        {type, ordered_set},
-        {rlog_shard, sdv_fanout},
-        {storage, rocksdb_copies},
-        {record_name, ?ID_REC},
-        {attributes, record_info(fields, ?ID_REC)}
-    ]),
+    ok = emqx_sdv_fanout_ids:create_tables(),
     ok.

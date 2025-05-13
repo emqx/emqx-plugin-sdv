@@ -39,10 +39,24 @@ The `sdv_fanout_data` and `sdv_fanout_ids` table will be deleted if the timestam
 
 ### Realtime Forwarding
 
-If the client (identified by VIN) is currently online, try to deliver the message immediately. But the data might still need to be stored for async ACK handling (or if any client is not online).
+- SDV platform publishes a batch, and the plugin will store the data in `sdv_fanout_data` and `sdv_fanout_ids` tables.
+- For each VIN, check if there are more than 1 fanout request for this VIN (lookup `sdv_fanout_ids` table).
+- If there are more than 1 fanout request, do nothing, the next send will be triggered after the previous one is finished.
+- For each VIN, the plugin will check if the client currently has a session registered (lookup `emqx_cm_registry`).
+- If the client has no session, do nothing. Data will be sent after vehicle is reconnected, see `Resume After Reconnection` section.
+- If the client has a session, forward a notification to the node where the client is registered (RPC call).
+- The local node (RPC handler) will check if the client is currently online (lookup `emqx_channel_live` table).
+- If the client is not online, do nothing. Data will be sent after vehicle is reconnected, see `Resume After Reconnection` section.
+- If the client is online, publish the data to the client with QoS=1 topic = `agent/${VIN}/proxy/request/${request_id}`.
+- The client will send `PUBACK`, and trigger the 'delivery.completed' hookpoint.
+- The plugin will delete the data from `sdv_fanout_ids` table, and send the next request if found.
 
 ### Resume After Reconnection
 
-Subscribes (either new subscribe, or resume session after session takeover) to `agent/${VIN}/proxy/request/+`, plugin will read from `sdv_fanout_ids` table, if found, read from `sdv_fanout_data` table, and publish data as payload to this subscription with QoS=1 topic = `agent/${VIN}/proxy/request/${request_id}`, and keep packet ID for correlation in process dictionary.
+- The plugin should hook to the `session.subscribed` hookpoint.
+- After vehicle subscribes to `agent/${VIN}/proxy/request/+`, the hook callback will read from `sdv_fanout_ids` table, if found, read from `sdv_fanout_data` table, and publish data as payload to this subscription with QoS=1 topic = `agent/${VIN}/proxy/request/${request_id}`.
+- The client will send `PUBACK`, and trigger the 'delivery.completed' hookpoint.
+- The plugin will delete the data from `sdv_fanout_ids` table, and send the next request if found.
 
-Subscribes sends `PUBACK`, plugin will find the `request_id` and delete from `sdv_fanout_ids` table.
+## Race Conditions
+

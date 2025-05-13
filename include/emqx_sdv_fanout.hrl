@@ -19,4 +19,10 @@
     data :: binary()
 }).
 
+-define(DB_SHARD, sdv_fanout).
+
+-include_lib("emqx_plugin_helper/include/logger.hrl").
+-define(LOGTAG, 'SDV_FANOUT').
+-define(LOG(Level, Msg, Data), ?SLOG(Level, maps:merge(Data, #{msg => Msg}), #{tag => ?LOGTAG})).
+
 -endif.
