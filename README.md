@@ -37,26 +37,33 @@ The `sdv_fanout_data` and `sdv_fanout_ids` table will be deleted if the timestam
 
 ## Data Flow
 
-### Realtime Forwarding
+This plugin starts a pool of dispatcher processes to fanout the data to the locally connected subscribers.
 
-- SDV platform publishes a batch, and the plugin will store the data in `sdv_fanout_data` and `sdv_fanout_ids` tables.
-- For each VIN, check if there are more than 1 fanout request for this VIN (lookup `sdv_fanout_ids` table).
-- If there are more than 1 fanout request, do nothing, the next send will be triggered after the previous one is finished.
-- For each VIN, the plugin will check if the client currently has a session registered (lookup `emqx_cm_registry`).
-- If the client has no session, do nothing. Data will be sent after vehicle is reconnected, see `Resume After Reconnection` section.
-- If the client has a session, forward a notification to the node where the client is registered (RPC call).
-- The local node (RPC handler) will check if the client is currently online (lookup `emqx_channel_live` table).
-- If the client is not online, do nothing. Data will be sent after vehicle is reconnected, see `Resume After Reconnection` section.
-- If the client is online, publish the data to the client with QoS=1 topic = `agent/${VIN}/proxy/request/${request_id}`.
-- The client will send `PUBACK`, and trigger the 'delivery.completed' hookpoint.
-- The plugin will delete the data from `sdv_fanout_ids` table, and send the next request if found.
+Below are the events which will trigger the fanout to the subscribers:
 
-### Resume After Reconnection
+### Dispatch Triggers
 
-- The plugin should hook to the `session.subscribed` hookpoint.
-- After vehicle subscribes to `agent/${VIN}/proxy/request/+`, the hook callback will read from `sdv_fanout_ids` table, if found, read from `sdv_fanout_data` table, and publish data as payload to this subscription with QoS=1 topic = `agent/${VIN}/proxy/request/${request_id}`.
-- The client will send `PUBACK`, and trigger the 'delivery.completed' hookpoint.
-- The plugin will delete the data from `sdv_fanout_ids` table, and send the next request if found.
+- **Batch Received**:
+   When a new batch is received, the publishing client will trigger the fanout data (and IDs) to be written to the database, then send notification to the dispatcher pool.  Depending on the session lookup result (pid), the notification `{maybe_send, new_batch, Pid, VIN}` should be sent to a dispatcher in the pool or an `rpc` call to a remote node to do the same.
+- **Session Subscribed**:
+  After a session is subscribed to `agent/${VIN}/proxy/request/+`, the plugin implemented callback (`'session.subscribed'`) should trigger a `{maybe_send, session_subscribed, Pid, VIN}` notification to the dispatcher pool.
+- **Session Resumed**:
+  For persisted sessions, the plugin implemented callback (`'session.resumed'`) should trigger a `{maybe_send, session_resumed, Pid, VIN}` notification to the dispatcher pool.
+- **PUBACK Received**:
+  When a `PUBACK` is received, the plugin implemented callback (`'delivery.completed'`) should delete the message ID from the `sdv_fanout_ids` table, and trigger a `{acknowledge, self(), RequestID}` notification to the dispatcher pool.
 
-## Race Conditions
+### Dispatch Process
 
+Each dispatcher process maintains a inflight state of the messages to be sent to the subscribers.
+
+The inflight state is a ETS table of tuples of `{Pid, VIN, RequestID}`.
+
+The dispatcher should call `emqx_cm:is_channel_connected/1` to check if the subscriber is currently online. Ignore the notification if the subscriber is not online.
+
+If there is already a message in flight, the `maybe_send` notification will be ignored.
+
+If there is no message in flight, the dispatcher will read the `sdv_fanout_ids` table to check if there is any message to be sent to the subscriber, if found, the dispatcher will send the message to the subscriber with QoS=1 topic = `agent/${VIN}/proxy/request/${request_id}`, monitor the subscriber process, and insert the sent message into the inflight table.
+
+If a `'DOWN'` message is received from the subscriber, the dispatcher will remove the subscriber from the inflight table. The next `maybe_send` notification will be sent to the dispatcher pool after the subscriber is online again.
+
+A special handling is needed for the `maybe_send` + `session_resumed` notification: if there is already a message in flight, the dispatcher should replace the old inflight message with the new Pid (and monitor the new Pid).
