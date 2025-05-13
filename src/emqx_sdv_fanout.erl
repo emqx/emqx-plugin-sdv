@@ -1,8 +1,5 @@
 -module(emqx_sdv_fanout).
 
--define(PLUGIN_NAME, "emqx_sdv_fanout").
--define(PLUGIN_VSN, "1.0.0").
-
 %% for #message{} record
 %% no need for this include if we call emqx_message:to_map/1 to convert it to a map
 -include_lib("emqx_plugin_helper/include/emqx.hrl").
@@ -144,12 +141,7 @@ start_link() ->
 
 init([]) ->
     erlang:process_flag(trap_exit, true),
-    PluginNameVsn = <<?PLUGIN_NAME, "-", ?PLUGIN_VSN>>,
-    Config = emqx_plugin_helper:get_config(PluginNameVsn),
-    ?SLOG(debug, #{
-        msg => "emqx_sdv_fanout_init",
-        config => Config
-    }),
+    Config = emqx_plugin_helper:get_config(?PLUGIN_NAME_VSN),
     persistent_term:put(?MODULE, Config),
     {ok, #{}}.
 

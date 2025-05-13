@@ -1,6 +1,10 @@
 -ifndef(EMQX_SDV_FANOUT_HRL).
 -define(EMQX_SDV_FANOUT_HRL, true).
 
+-define(PLUGIN_NAME, "emqx_sdv_fanout").
+-define(PLUGIN_VSN, ?plugin_rel_vsn).
+-define(PLUGIN_NAME_VSN, <<?PLUGIN_NAME, "-", ?PLUGIN_VSN>>).
+
 -define(ID_TAB, sdv_fanout_ids).
 -define(DATA_TAB, sdv_fanout_data).
 

@@ -1,0 +1,18 @@
+{
+  "type": "record",
+  "name": "ExtendedConfig",
+  "fields": [
+    {
+      "name": "dispatcher_pool_size",
+      "type": "int",
+      "default": 0,
+      "$ui": {
+        "component": "input",
+        "flex": 12,
+        "required": false,
+        "label": "$dispatcher_pool_size_label",
+        "description": "$dispatcher_pool_size_desc"
+      }
+    }
+  ]
+}
