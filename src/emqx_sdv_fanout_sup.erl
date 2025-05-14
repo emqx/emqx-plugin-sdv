@@ -12,6 +12,7 @@ start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 init([]) ->
+    ok = emqx_sdv_fanout_inflight:create_tables(),
     SupFlags = #{
         strategy => one_for_all,
         intensity => 100,

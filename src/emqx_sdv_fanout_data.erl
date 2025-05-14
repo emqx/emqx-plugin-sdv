@@ -3,7 +3,8 @@
 -export([
     create_tables/0,
     exists/1,
-    insert/2
+    insert/2,
+    read/1
 ]).
 
 -include("emqx_sdv_fanout.hrl").
@@ -36,6 +37,15 @@ exists(Sha1) ->
             true;
         _ ->
             false
+    end.
+
+%% @doc Read the data from disk.
+read(Sha1) ->
+    case mnesia:dirty_read(?DATA_TAB, Sha1) of
+        [#?DATA_REC{data = Data}] ->
+            {ok, Data};
+        [] ->
+            {error, not_found}
     end.
 
 seudo_prev(Sha1) when is_binary(Sha1) ->

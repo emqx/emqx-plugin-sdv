@@ -36,5 +36,4 @@ on_health_check(Options) ->
 create_tables() ->
     ok = emqx_sdv_fanout_data:create_tables(),
     ok = emqx_sdv_fanout_ids:create_tables(),
-    ok = emqx_sdv_fanout_inflight:create_tables(),
     ok.

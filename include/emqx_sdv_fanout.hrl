@@ -15,9 +15,11 @@
 -define(DATA_REC, sdv_fanout_data).
 -define(INFLIGHT_REC, sdv_fanout_inflight).
 
+-define(REF_KEY(VIN, Ts, RequestID), {VIN, Ts, RequestID}).
+-type ref_key() :: ?REF_KEY(VIN :: binary(), Ts :: erlang:timestamp(), RequestID :: binary()).
+
 -record(?ID_REC, {
-    key :: {VIN :: binary(), RequestID :: binary()},
-    ts :: erlang:timestamp(),
+    key :: ref_key(),
     data_id :: binary(),
     extra = [] :: [any()]
 }).
@@ -31,8 +33,7 @@
 
 -record(?INFLIGHT_REC, {
     pid :: pid(),
-    vin :: binary(),
-    request_id :: binary()
+    ref :: ref_key()
 }).
 
 -define(DB_SHARD, sdv_fanout).
@@ -43,11 +44,11 @@
 
 -define(DISPATCHER_POOL, emqx_sdv_fanout_dispatcher).
 
--define(MAYBE_SEND(Trigger, Pid, VIN), {maybe_send, Trigger, Pid, VIN}).
+-define(MAYBE_SEND(Trigger, SubPid, VIN), {maybe_send, Trigger, SubPid, VIN}).
 -define(TRG_NEW_BATCH, new_batch_received).
 -define(TRG_HEARTBEAT, vehicle_heartbeat).
 
 -define(TRG_ACKED, vehicle_ack).
--define(ACKED(Pid, VIN, RequestId), {?TRG_ACKED, Pid, VIN, RequestId}).
+-define(ACKED(SubPid, VIN, RequestId), {?TRG_ACKED, SubPid, VIN, RequestId}).
 
 -endif.

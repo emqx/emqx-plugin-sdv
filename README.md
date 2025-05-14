@@ -54,7 +54,7 @@ Below are the events which will trigger the fanout to the subscribers:
 
 Each dispatcher process maintains a inflight state of the messages to be sent to the subscribers.
 
-The inflight state is a ETS table of tuples of `{Pid, VIN, RequestID}`.
+The inflight state is a ETS table of tuples of `{Key = SubPid, VIN, Ts, RequestID}`.
 
 The dispatcher should call `emqx_cm:is_channel_connected/1` to check if the subscriber is currently online. Ignore the notification if the subscriber is not online.
 
@@ -62,6 +62,4 @@ If there is already a message in flight, the `maybe_send` notification will be i
 
 If there is no message in flight, the dispatcher will read the `sdv_fanout_ids` table to check if there is any message to be sent to the subscriber, if found, the dispatcher will send the message to the subscriber with QoS=1 topic = `agent/${VIN}/proxy/request/${request_id}`, monitor the subscriber process, and insert the sent message into the inflight table.
 
-If a `'DOWN'` message is received from the subscriber, the dispatcher will remove the subscriber from the inflight table. The next `maybe_send` notification will be sent to the dispatcher pool after the subscriber is online again.
-
-A special handling is needed for the `maybe_send` + `session_resumed` notification: if there is already a message in flight, the dispatcher should replace the old inflight message with the new Pid (and monitor the new Pid).
+If a `'DOWN'` message is received from the subscriber, the dispatcher will remove the subscriber from the inflight table. The next `maybe_send` notification will be sent to the dispatcher pool after the vehicle reconnects and send heartbeat again.

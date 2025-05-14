@@ -3,7 +3,7 @@
 # Send a message to the SDV platform
 
 REQUEST_ID=$(date +%s)
-PAYLOAD="{\"ids\": [\"1234567890\", \"1234567891\"], \"request_id\": \"$REQUEST_ID\", \"data\": \"test\"}"
+PAYLOAD="{\"ids\": [\"1\", \"2\"], \"request_id\": \"$REQUEST_ID\", \"data\": \"testdata $(date)\"}"
 
 echo "Sending $PAYLOAD"
 

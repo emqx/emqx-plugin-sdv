@@ -50,7 +50,7 @@ hook() ->
     %% but not to leak to retainer or rule engine
     emqx_hooks:add('message.publish', {?MODULE, on_message_publish, []}, ?HP_RETAINER + 1),
     %% Handle PUBACK from subscribers (vehicles)
-    emqx_hooks:add('message.puback', {?MODULE, on_message_puback, []}, ?HP_HIGHEST),
+    emqx_hooks:add('delivery.completed', {?MODULE, on_delivery_completed, []}, ?HP_HIGHEST),
     ok.
 
 %% @doc
