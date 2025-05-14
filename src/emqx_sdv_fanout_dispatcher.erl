@@ -170,7 +170,8 @@ code_change(_OldVsn, State, _Extra) ->
 %% @doc Send the next message to the client process.
 %% Returns ok if the message is sent.
 %% Returns ignore if there is no message to send.
--spec maybe_send(Trigger :: atom(), SubPid :: pid(), VIN :: binary(), DispatchId :: integer()) -> {ok, ref_key()} | ignore.
+-spec maybe_send(Trigger :: atom(), SubPid :: pid(), VIN :: binary(), DispatchId :: integer()) ->
+    {ok, ref_key()} | ignore.
 maybe_send(Trigger, SubPid, VIN, DispatcherId) ->
     case emqx_sdv_fanout_ids:first(VIN) of
         {ok, {RefKey, DataID}} ->
@@ -184,7 +185,11 @@ maybe_send2(Trigger, SubPid, RefKey, DataID, DispatchId) ->
     case emqx_sdv_fanout_data:read(DataID) of
         {ok, Data} ->
             ?LOG(info, "publish_to_subscriber", #{
-                trigger => Trigger, sub_pid => SubPid, vin => VIN, request_id => RequestId, dispatch_id => DispatchId
+                trigger => Trigger,
+                sub_pid => SubPid,
+                vin => VIN,
+                request_id => RequestId,
+                dispatch_id => DispatchId
             }),
             ok = deliver_to_subscriber(SubPid, VIN, RequestId, Data, DispatchId),
             {ok, RefKey};

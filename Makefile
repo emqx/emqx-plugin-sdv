@@ -52,3 +52,7 @@ fmt: $(REBAR)
 .PHONY: run
 run: rel
 	./run.sh
+
+.PHONY: test
+test: $(REBAR)
+	$(REBAR) ct -v
