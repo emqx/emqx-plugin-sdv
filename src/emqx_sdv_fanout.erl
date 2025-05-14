@@ -80,7 +80,7 @@ on_message_publish(#message{topic = ?SDV_FANOUT_TOPIC, payload = Payload} = Mess
     end;
 on_message_publish(#message{topic = <<"ecp/", Heartbeat/binary>>} = Message) ->
     case emqx_topic:words(Heartbeat) of
-        [VIN, <<"online">>] ->
+        [VIN, Event] when Event =:= <<"online">> orelse Event =:= <<"heartbeat">> ->
             ok = emqx_sdv_fanout_dispatcher:heartbeat(VIN);
         _ ->
             ok

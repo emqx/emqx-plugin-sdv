@@ -3,7 +3,7 @@
 -export([
     create_tables/0,
     insert/4,
-    first/1,
+    next/1,
     delete/1
 ]).
 
@@ -14,7 +14,7 @@ create_tables() ->
     ok = mria:create_table(?ID_TAB, [
         {type, ordered_set},
         {rlog_shard, ?DB_SHARD},
-        {storage, rocksdb_copies},
+        {storage, ram_copies},
         {record_name, ?ID_REC},
         {attributes, record_info(fields, ?ID_REC)}
     ]).
@@ -23,16 +23,18 @@ create_tables() ->
 insert(VIN, Ts, RequestId, DataID) when
     is_integer(Ts), is_binary(RequestId), is_binary(DataID), is_binary(VIN)
 ->
-    mnesia:dirty_write(?ID_TAB, #?ID_REC{key = ?REF_KEY(VIN, Ts, RequestId), data_id = DataID}).
+    mria:dirty_write(?ID_TAB, #?ID_REC{key = ?REF_KEY(VIN, Ts, RequestId), data_id = DataID}).
 
-%% @doc Get the first ID for a VIN.
--spec first(VIN :: binary()) -> {ok, {ref_key(), DataID :: binary()}} | {error, empty}.
-first(VIN0) ->
-    case mnesia:dirty_next(?ID_TAB, seudo_prev(VIN0)) of
-        ?REF_KEY(VIN1, _Ts, _RequestId) = Key when VIN1 =:= VIN0 ->
-            case mnesia:dirty_read(?ID_TAB, Key) of
-                [#?ID_REC{key = Key, data_id = ID}] ->
-                    {ok, {Key, ID}};
+%% @doc Get the next RefKey and DataID for a VIN or the last-seen RefKey.
+-spec next(Key :: binary() | ref_key()) -> {ok, {ref_key(), DataID :: binary()}} | {error, empty}.
+next(VIN) when is_binary(VIN) ->
+    next(seudo_prev(VIN));
+next(?REF_KEY(VIN, _Ts, _RequestId) = RefKey) ->
+    case mnesia:dirty_next(?ID_TAB, RefKey) of
+        ?REF_KEY(VIN1, _Ts1, _RequestId1) = NextKey when VIN1 =:= VIN ->
+            case mnesia:dirty_read(?ID_TAB, NextKey) of
+                [#?ID_REC{key = NextKey, data_id = ID}] ->
+                    {ok, {NextKey, ID}};
                 [] ->
                     %% race condition, the record is deleted while we are reading it
                     {error, empty}

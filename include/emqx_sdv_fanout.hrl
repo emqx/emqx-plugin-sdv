@@ -36,19 +36,19 @@
     ref :: ref_key()
 }).
 
--define(DB_SHARD, sdv_fanout).
+-define(DB_SHARD, sdv_fanout_shard).
 
 -include_lib("emqx_plugin_helper/include/logger.hrl").
--define(LOGTAG, 'SDV_FANOUT').
+-define(LOGTAG, "SDV_FANOUT").
 -define(LOG(Level, Msg, Data), ?SLOG(Level, maps:merge(Data, #{msg => Msg}), #{tag => ?LOGTAG})).
 
 -define(DISPATCHER_POOL, emqx_sdv_fanout_dispatcher).
 
--define(MAYBE_SEND(Trigger, SubPid, VIN), {maybe_send, Trigger, SubPid, VIN}).
+-define(MAYBE_SEND(Trigger, SubPid, VIN_Or_RefKey), {maybe_send, Trigger, SubPid, VIN_Or_RefKey}).
 -define(TRG_NEW_BATCH, new_batch_received).
 -define(TRG_HEARTBEAT, vehicle_heartbeat).
 
 -define(TRG_ACKED, vehicle_ack).
--define(ACKED(SubPid, VIN, RequestId), {?TRG_ACKED, SubPid, VIN, RequestId}).
+-define(ACKED(SubPid, RefKey), {?TRG_ACKED, SubPid, RefKey}).
 
 -endif.

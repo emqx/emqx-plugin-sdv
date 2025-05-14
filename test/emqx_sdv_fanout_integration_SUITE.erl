@@ -7,7 +7,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -compile(export_all).
--compile({nowarn_export_all, true}).
+-compile(nowarn_export_all).
 
 all() ->
     [
@@ -25,7 +25,7 @@ is_test_function(F) ->
 init_per_suite(Config) ->
     Config.
 
-end_per_suite(Config) ->
+end_per_suite(_Config) ->
     ok.
 
 init_per_testcase(_Case, Config) ->
@@ -41,7 +41,7 @@ t_realtime_dispatch(_Config) ->
     VINs = [vin(UniqueId, I) || I <- lists:seq(1, 10)],
     {ok, SubPids} = start_vehicle_clients(VINs),
     try
-        {ok, PubPid} = start_batch_publisher(VINs),
+        {ok, PubPid} = start_batch_publisher(),
         try
             {ok, {RequestId, Data}} = publish_batch(PubPid, VINs),
             ok = assert_payload_received(SubPids, RequestId, Data)
@@ -57,7 +57,7 @@ t_realtime_dispatch(_Config) ->
 t_late_subscribe(_Config) ->
     UniqueId = erlang:system_time(millisecond),
     VINs = [vin(UniqueId, I) || I <- lists:seq(1, 10)],
-    {ok, PubPid} = start_batch_publisher(VINs),
+    {ok, PubPid} = start_batch_publisher(),
     try
         {ok, {RequestId, Data}} = publish_batch(PubPid, VINs),
         {ok, SubPids} = start_vehicle_clients(VINs),
@@ -67,10 +67,11 @@ t_late_subscribe(_Config) ->
         after 1000 ->
             ok
         end,
-        ok = send_heartbeat(SubPids),
+        HeartbeatPid = send_heartbeats(SubPids),
         try
             ok = assert_payload_received(SubPids, RequestId, Data)
         after
+            HeartbeatPid ! stop,
             ok = stop_clients(SubPids)
         end
     after
@@ -81,11 +82,11 @@ t_late_subscribe(_Config) ->
 %% but will receive after heartbeat is sent.
 t_disconnected_session_does_not_receive_dispatch(_Config) ->
     UniqueId = erlang:system_time(millisecond),
-    VINs = [vin(UniqueId, I) || I <- lists:seq(1, 1)],
-    {ok, PubPid} = start_batch_publisher(VINs),
+    VINs = [vin(UniqueId, I) || I <- lists:seq(1, 10)],
+    {ok, PubPid} = start_batch_publisher(),
     try
         {ok, {RequestId, Data}} = publish_batch(PubPid, VINs),
-        Opts = [{clean_start, false}, {properties, #{'Session-Expiry-Interval' => 60}}],
+        Opts = [{clean_start, false}, {properties, #{'Session-Expiry-Interval' => 10}}],
         {ok, SubPids0} = start_vehicle_clients(VINs, Opts),
         ok = stop_clients(SubPids0),
         {ok, SubPids} = start_vehicle_clients(VINs, Opts),
@@ -96,10 +97,11 @@ t_disconnected_session_does_not_receive_dispatch(_Config) ->
         after 1000 ->
             ok
         end,
-        ok = send_heartbeat(SubPids),
+        HeartbeatPid = send_heartbeats(SubPids),
         try
             ok = assert_payload_received(SubPids, RequestId, Data)
         after
+            HeartbeatPid ! stop,
             ok = stop_clients(SubPids)
         end
     after
@@ -117,8 +119,16 @@ assert_payload_received(SubPids, RequestId, Data) ->
                 Topic = maps:get(topic, Msg),
                 [<<"agent">>, VIN0, <<"proxy">>, <<"request">>, RequestId] = words(Topic),
                 ?assertEqual(VIN, VIN0),
-                ?assert(lists:member({VIN, SubPid}, SubPids)),
-                lists:delete({VIN, SubPid}, SubPids)
+                case lists:member({VIN, SubPid}, SubPids) of
+                    true ->
+                        lists:delete({VIN, SubPid}, SubPids);
+                    false ->
+                        ct:fail(#{
+                            reason => unexpected_subscriber,
+                            got => {VIN, SubPid},
+                            expected => SubPids
+                        })
+                end
         after 10000 ->
             ct:fail(#{
                 reason => timeout,
@@ -127,10 +137,20 @@ assert_payload_received(SubPids, RequestId, Data) ->
         end,
     assert_payload_received(Remain, RequestId, Data).
 
-start_batch_publisher(BatchSize) ->
-    {ok, Pid} = emqtt:start_link([{clientid, <<"sdv-batch-publisher">>}, {proto_ver, v5}]),
+start_batch_publisher() ->
+    {ok, Pid} = emqtt:start_link([
+        {host, mqtt_endpoint()}, {clientid, <<"sdv-batch-publisher">>}, {proto_ver, v5}
+    ]),
     {ok, _} = emqtt:connect(Pid),
     {ok, Pid}.
+
+mqtt_endpoint() ->
+    case os:getenv("EMQX_MQTT_ENDPOINT") of
+        false ->
+            "127.0.0.1";
+        Endpoint ->
+            Endpoint
+    end.
 
 publish_batch(Pid, VINs) ->
     Topic = <<"$SDV-FANOUT">>,
@@ -151,9 +171,11 @@ start_vehicle_clients(VINs, Opts) ->
     lists:foldl(
         fun(VIN, {ok, Pids}) ->
             MsgHandler = #{publish => fun(Msg) -> Owner ! {publish_received, self(), VIN, Msg} end},
-            {ok, Pid} = emqtt:start_link([
-                {clientid, VIN}, {proto_ver, v5}, {msg_handler, MsgHandler}
-            ] ++ Opts),
+            {ok, Pid} = emqtt:start_link(
+                [
+                    {clientid, VIN}, {proto_ver, v5}, {msg_handler, MsgHandler}
+                ] ++ Opts
+            ),
             {ok, _} = emqtt:connect(Pid),
             QoS = 1,
             {ok, _, _} = emqtt:subscribe(Pid, sub_topic(VIN), QoS),
@@ -184,14 +206,31 @@ vin(UniqueId, I) ->
 words(Topic) ->
     binary:split(Topic, <<"/">>, [global]).
 
-send_heartbeat(SubPids) ->
+%% First send online message, then send heartbeat messages.
+send_heartbeats(SubPids) ->
     lists:foreach(
         fun({VIN, Pid}) ->
             Topic = bin([<<"ecp/">>, VIN, <<"/online">>]),
             {ok, _} = emqtt:publish(Pid, Topic, <<"">>, 1)
         end,
         SubPids
-    ).
+    ),
+    spawn_link(fun() -> heartbeat_loop(SubPids) end).
+
+heartbeat_loop(SubPids) ->
+    receive
+        stop ->
+            exit(normal)
+    after 1000 ->
+        lists:foreach(
+            fun({VIN, Pid}) ->
+                Topic = bin([<<"ecp/">>, VIN, <<"/heartbeat">>]),
+                {ok, _} = emqtt:publish(Pid, Topic, <<"">>, 1)
+            end,
+            SubPids
+        ),
+        heartbeat_loop(SubPids)
+    end.
 
 bin(IoData) ->
     iolist_to_binary(IoData).

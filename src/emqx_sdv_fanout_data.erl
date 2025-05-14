@@ -13,8 +13,8 @@
 create_tables() ->
     ok = mria:create_table(?DATA_TAB, [
         {type, ordered_set},
-        {rlog_shard, sdv_fanout},
-        {storage, rocksdb_copies},
+        {rlog_shard, ?DB_SHARD},
+        {storage, ram_copies},
         {record_name, ?DATA_REC},
         {attributes, record_info(fields, ?DATA_REC)}
     ]).

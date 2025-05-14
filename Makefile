@@ -8,7 +8,7 @@ REBAR = $(CURDIR)/rebar3
 SCRIPTS = $(CURDIR)/scripts
 
 .PHONY: all
-all: compile
+all: rel
 
 .PHONY: ensure-rebar3
 ensure-rebar3:
