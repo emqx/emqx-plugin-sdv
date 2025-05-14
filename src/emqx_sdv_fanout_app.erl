@@ -34,12 +34,7 @@ on_health_check(Options) ->
     emqx_sdv_fanout:on_health_check(Options).
 
 create_tables() ->
-    ok = mria:create_table(?DATA_TAB, [
-        {type, ordered_set},
-        {rlog_shard, sdv_fanout},
-        {storage, rocksdb_copies},
-        {record_name, ?DATA_REC},
-        {attributes, record_info(fields, ?DATA_REC)}
-    ]),
+    ok = emqx_sdv_fanout_data:create_tables(),
     ok = emqx_sdv_fanout_ids:create_tables(),
+    ok = emqx_sdv_fanout_inflight:create_tables(),
     ok.

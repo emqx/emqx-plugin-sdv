@@ -51,6 +51,8 @@ Below are the events which will trigger the fanout to the subscribers:
   For persisted sessions, the plugin implemented callback (`'session.resumed'`) should trigger a `{maybe_send, session_resumed, Pid, VIN}` notification to the dispatcher pool.
 - **PUBACK Received**:
   When a `PUBACK` is received, the plugin implemented callback (`'delivery.completed'`) should delete the message ID from the `sdv_fanout_ids` table, and trigger a `{acknowledge, self(), RequestID}` notification to the dispatcher pool.
+- **Heartbeat**:
+  The vehicle periodically sends heartbeat to the EMQX using the topic `ecp/${VIN}/online`. The plugin implemented callback (`'message.publish'`) should trigger a `{maybe_send, heartbeat, Pid, VIN}` notification to the dispatcher pool. This is to ensure messages are sent to the vehicle even if other triggers missed due to race conditions. For example, after client session resume it may not observe the new batch being inserted in another node, and the new batch handler in the other node may not see the session being online, hence both nodes miss the opportunity to send the message. This heartbeat is to ensure the message is eventually sent.
 
 ### Dispatch Process
 

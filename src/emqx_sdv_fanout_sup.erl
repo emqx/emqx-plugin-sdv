@@ -25,7 +25,7 @@ init([]) ->
         type => worker,
         modules => [emqx_sdv_fanout]
     },
-    PoolModule = emqx_sdv_fanout_dispatcher,
+    PoolModule = ?DISPATCHER_POOL,
     PoolType = hash,
     PoolSize = resolve_pool_size(),
     MFA = {PoolModule, start_link, []},
