@@ -45,8 +45,6 @@
 
 -define(MAYBE_SEND(Trigger, Pid, VIN), {maybe_send, Trigger, Pid, VIN}).
 -define(TRG_NEW_BATCH, new_batch_received).
--define(TRG_SESSION_SUBSCRIBED, session_subscribed).
--define(TRG_SESSION_RESUMED, session_resumed).
 -define(TRG_HEARTBEAT, vehicle_heartbeat).
 
 -define(TRG_ACKED, vehicle_ack).

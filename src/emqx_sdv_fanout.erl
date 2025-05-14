@@ -78,6 +78,14 @@ on_message_publish(#message{topic = ?SDV_FANOUT_TOPIC, payload = Payload} = Mess
             ?LOG(error, "failed_to_handle_batch_will_disconnect", Reason),
             {stop, Message#message{headers = Headers#{should_disconnect => true}}}
     end;
+on_message_publish(#message{topic = <<"ecp/", Heartbeat/binary>>} = Message) ->
+    case emqx_topic:words(Heartbeat) of
+        [VIN, <<"online">>] ->
+            ok = emqx_sdv_fanout_dispatcher:heartbeat(VIN);
+        _ ->
+            ok
+    end,
+    {ok, Message};
 on_message_publish(Message) ->
     %% Other topics, non of our business, just pass it on.
     {ok, Message}.

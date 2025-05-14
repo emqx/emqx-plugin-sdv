@@ -1,11 +1,11 @@
 -module(emqx_sdv_fanout_dispatcher).
 
--export([batch/1, ack/2]).
+-export([batch/1, ack/2, heartbeat/1]).
 
 -export([start_link/2]).
 
 %% RPC
--export([notify_dispatcher/3]).
+-export([notify_dispatcher_if_vehicle_online/3]).
 
 -export([
     init/1,
@@ -37,6 +37,12 @@ ack(VIN, RequestId) ->
     Dispatcher = gproc_pool:pick_worker(?DISPATCHER_POOL, VIN),
     gen_server:cast(Dispatcher, ?ACKED(self(), VIN, RequestId)).
 
+%% @doc Handle a heartbeat from a vehicle.
+heartbeat(VIN) ->
+    %% this is called by the vehicle client process itself,
+    %% so it's for sure online, directly notify the dispatcher
+    do_notify_dispatcher(self(), VIN, ?TRG_HEARTBEAT).
+
 insert_batch(VINs, RequestId, Data) ->
     Now = now_ts(),
     {ok, ID} = emqx_sdv_fanout_data:insert(Now, Data),
@@ -47,7 +53,7 @@ notify_dispatchers([]) ->
 notify_dispatchers([VIN | VINs]) ->
     case emqx_cm:lookup_channels(VIN) of
         [Pid] ->
-            notify_dispatcher(Pid, VIN, ?TRG_NEW_BATCH);
+            notify_dispatcher_if_vehicle_online(Pid, VIN, ?TRG_NEW_BATCH);
         _ ->
             %% If no channel is found, ignore because the client is not connected
             %% If more than one channel is found, ignore because the client is in the middle of session takeover/resumption
@@ -57,7 +63,7 @@ notify_dispatchers([VIN | VINs]) ->
     notify_dispatchers(VINs).
 
 %% @doc Notify the dispatcher of a new message.
-notify_dispatcher(Pid, VIN, Trigger) when node(Pid) =:= node() ->
+notify_dispatcher_if_vehicle_online(Pid, VIN, Trigger) when node(Pid) =:= node() ->
     case emqx_cm:is_channel_connected(Pid) of
         true ->
             do_notify_dispatcher(Pid, VIN, Trigger);
@@ -67,10 +73,10 @@ notify_dispatcher(Pid, VIN, Trigger) when node(Pid) =:= node() ->
             %% again, so we don't need to do anything here
             ok
     end;
-notify_dispatcher(Pid, VIN, Trigger) ->
+notify_dispatcher_if_vehicle_online(Pid, VIN, Trigger) ->
     %% the client is not on this node, RPC to the remote node
     %% and the remote node will notify the dispatcher
-    emqx_rpc:cast(node(Pid), ?MODULE, notify_dispatcher, [Pid, VIN, Trigger]).
+    emqx_rpc:cast(node(Pid), ?MODULE, notify_dispatcher_if_vehicle_online, [Pid, VIN, Trigger]).
 
 do_notify_dispatcher(Pid, VIN, Trigger) ->
     Dispatcher = gproc_pool:pick_worker(?DISPATCHER_POOL, VIN),
