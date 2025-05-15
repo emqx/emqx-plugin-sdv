@@ -26,8 +26,8 @@ jobs:
     - name: Check format
       run: make fmt-check
 
-    - name: Build Plugin Release
-      run: make rel
+    - name: Run tests
+      run: make run test
 
   release:
     name: Publish release
