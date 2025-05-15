@@ -24,22 +24,20 @@ The messages published from SDV platform are in JSON format with the following f
 
 ## Data Storage
 
-The data is stored in two mnesia tables.
+The data is stored in below mnesia tables:
 
-`sdv_fanout_data`: Key is the `sha1` of the data, value is the timestamp and the binary data itself.
-`sdv_fanout_ids`: Key is a composite key of `vin` and `request_id`, value is the timestamp and the `sha1` of the data.
+- `sdv_fanout_data`: Key is the unique ID (SHA1 by SDV platform) of the data, value is the binary blob of the data itself.
+- `sdv_fanout_meta`: Key is the unique ID (SHA1 by SDV platform) of the data, value is the metadata of the data.
+- `sdv_fanout_ids`: Key is a composite key of `vin`, `timestamp`, and `request_id`, value is the unique ID of the data.
 
 ### Compaction
 
-If data has an existing `sha1` checksum in data table, no need to write again.
+SDV platform may publish the same data multiple times, so we need to deduplicate the data by the ID (but keep updating the timestamp).
+If data ID is already in the `sdv_fanout_meta` table, no need to write again.
 
-The 200 IDs in the original messages might be just a fraction of a larger batch, so the hashing will significantly reduce the amount of data to be written.
+### Garbage Collection
 
-### Garbage collection
-
-This plugin runs periodic garbage collection to delete `sdv_fanout_data` record if there is no reference left from `sdv_fanout_ids` table.
-
-The `sdv_fanout_data` and `sdv_fanout_ids` table will be deleted if the timestamp is older than the configured retention period.
+This plugin runs periodic garbage collection to delete from `sdv_fanout_data` and `sdv_fanout_meta` if the timestamp is older than the configured retention period.
 
 ## Data Flow
 
