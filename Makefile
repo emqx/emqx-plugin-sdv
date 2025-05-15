@@ -49,6 +49,10 @@ rel: $(REBAR)
 fmt: $(REBAR)
 	$(REBAR) fmt --verbose -w
 
+.PHONY: fmt-check
+fmt-check: $(REBAR)
+	$(REBAR) fmt --verbose --check
+
 .PHONY: run
 run: rel
 	./run.sh emqx/emqx-enterprise:5.9.0
