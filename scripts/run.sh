@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 
+# Smoke test and integration test.
+# Starts EMQX cluster with 3 nodes, 2 cores and 1 replicant.
+
 set -euo pipefail
+
+cd -P -- "$(dirname -- "$0")/../"
 
 PLUGIN_VSN="$(grep -o 'plugin_rel_vsn, "[^"]*"' rebar.config | cut -d'"' -f2)"
 

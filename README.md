@@ -8,6 +8,12 @@ Then it will fanout the messages to the corresponding VINs in a reactive manner.
 
 <img src="overview.png" alt="Overview" width="600">
 
+## Quick Start
+
+- Start EMQX cluster with plugin installed: `make run`
+- Mock vehicle to subscribe fanout topic: `./scripts/sub.sh 1`
+- Mock SDV platform to send a batch: `./scripts/send.sh`
+
 ## Data Format
 
 The messages published from SDV platform are in JSON format with the following fields:
