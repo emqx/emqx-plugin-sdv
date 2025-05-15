@@ -220,3 +220,14 @@ validate_plugin "$NODE1"
 validate_plugin "$NODE2"
 validate_plugin "$NODE3"
 echo "Plugin emqx_sdv-${PLUGIN_VSN} is running in all nodes."
+
+cmd() {
+    docker exec node1.emqx.io emqx ctl sdv $@
+}
+
+echo "Test ctl command show-config"
+cmd show-config
+cmd show-config origin
+cmd show-config inuse
+cmd show-config origin --json
+echo "Test ctl command show-config done"

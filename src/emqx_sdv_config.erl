@@ -36,7 +36,7 @@ get_data_retention() ->
 parse(<<"data_retention">>, Str) ->
     {data_retention, to_duration_ms(Str)};
 parse(<<"dispatcher_pool_size">>, Size) ->
-    (Size < 1 orelse Size > 10240) andalso throw("invalid_dispatcher_pool_size"),
+    (Size < 0 orelse Size > 10240) andalso throw("invalid_dispatcher_pool_size"),
     {dispatcher_pool_size, Size}.
 
 to_duration_ms(Str) ->

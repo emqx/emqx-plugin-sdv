@@ -9,31 +9,33 @@
 -include("emqx_sdv.hrl").
 
 cmd(["show-config" | More]) ->
-    emqx_ctl:print("~ts~n", [get_config(More)]);
+    emqx_ctl:print("~ts", [format_config(More)]);
 cmd(_) ->
-    emqx_ctl:usage([
-        {"show-config [origin|inuse] [--json]",
-            "Show current config, 'origin' for original config, "
-            "'inuse' for in-use (parsed) config, add '--json' for JSON format."}
-    ]).
+    emqx_ctl:usage([usage("show-config")]).
 
-get_config([]) ->
-    get_config(["origin"]);
-get_config(["origin" | MaybeJSON]) ->
+format_config([]) ->
+    format_config(["origin"]);
+format_config(["origin" | MaybeJSON]) ->
     Config = emqx_plugin_helper:get_config(?PLUGIN_NAME_VSN),
     case MaybeJSON of
-        "--json" ->
-            emqx_utils_json:encode(Config);
+        ["--json" | _] ->
+            [emqx_utils_json:encode(Config), "\n"];
         _ ->
-            hocon_pp:do(Config)
+            hocon_pp:do(Config, #{})
     end;
-get_config(["inuse" | MaybeJSON]) ->
+format_config(["inuse" | MaybeJSON]) ->
     Config = emqx_sdv_config:get(),
     case MaybeJSON of
-        "--json" ->
-            emqx_utils_json:encode(Config);
+        ["--json" | _] ->
+            [emqx_utils_json:encode(Config), "\n"];
         _ ->
-            io_lib:format("~p~n", [hocon_pp:do(Config)])
+            io_lib:format("~p~n", [Config])
     end;
-get_config(_) ->
-    error("invalid_config_key").
+format_config(Args) ->
+    emqx_ctl:print("bad args for show-config: ~p~n", [Args]),
+    emqx_ctl:usage([usage("show-config")]).
+
+usage("show-config") ->
+    {"show-config [origin|inuse] [--json]",
+        "Show current config, 'origin' for original config, "
+        "'inuse' for in-use (parsed) config, add '--json' for JSON format."}.

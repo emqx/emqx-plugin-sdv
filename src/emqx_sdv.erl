@@ -158,7 +158,8 @@ start_link() ->
 init([]) ->
     erlang:process_flag(trap_exit, true),
     Config = emqx_plugin_helper:get_config(?PLUGIN_NAME_VSN),
-    emqx_sdv_config:put(Config),
+    Parsed = emqx_sdv_config:parse(Config),
+    emqx_sdv_config:put(Parsed),
     {ok, Config}.
 
 handle_call(_Request, _From, State) ->
