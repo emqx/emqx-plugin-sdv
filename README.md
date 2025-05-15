@@ -1,4 +1,4 @@
-# EMQX SDV Fanout
+# EMQX Plugin for Software Defined Vehicle
 
 This EMQX plugin is to implement message fanout for EMQ SDV platform.
 The messages are published from SDV platform with a batch of VINs for each request (identified by a unique RequestID).

@@ -12,7 +12,7 @@
     is_exist/1
 ]).
 
--include("emqx_sdv_fanout.hrl").
+-include("emqx_sdv.hrl").
 
 %% @doc Create the tables.
 create_tables() ->

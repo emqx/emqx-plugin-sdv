@@ -2,7 +2,7 @@
 %% Copyright (c) 2025 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%--------------------------------------------------------------------
 
--module(emqx_sdv_fanout_app).
+-module(emqx_sdv_app).
 
 -behaviour(application).
 
@@ -18,26 +18,26 @@
     on_health_check/1
 ]).
 
--include("emqx_sdv_fanout.hrl").
+-include("emqx_sdv.hrl").
 
 start(_StartType, _StartArgs) ->
     create_tables(),
     ok = mria_rlog:wait_for_shards([?DB_SHARD], infinity),
     ok = mria:wait_for_tables([?ID_TAB, ?DATA_TAB]),
-    {ok, Sup} = emqx_sdv_fanout_sup:start_link(),
-    emqx_sdv_fanout:hook(),
-    emqx_ctl:register_command(sdv, {emqx_sdv_fanout_cli, cmd}),
+    {ok, Sup} = emqx_sdv_sup:start_link(),
+    emqx_sdv:hook(),
+    emqx_ctl:register_command(sdv, {emqx_sdv_cli, cmd}),
     {ok, Sup}.
 
 stop(_State) ->
-    emqx_ctl:unregister_command(emqx_sdv_fanout),
-    emqx_sdv_fanout:unhook().
+    emqx_ctl:unregister_command(sdv),
+    emqx_sdv:unhook().
 
 on_config_changed(OldConfig, NewConfig) ->
-    emqx_sdv_fanout:on_config_changed(OldConfig, NewConfig).
+    emqx_sdv:on_config_changed(OldConfig, NewConfig).
 
 on_health_check(Options) ->
-    emqx_sdv_fanout:on_health_check(Options).
+    emqx_sdv:on_health_check(Options).
 
 create_tables() ->
     ok = emqx_sdv_fanout_data:create_tables(),

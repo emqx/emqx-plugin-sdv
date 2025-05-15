@@ -75,7 +75,7 @@ function run_emqx() {
       -e EMQX_NODE_COOKIE="$COOKIE" \
       -e EMQX_NODE__ROLE="$role" \
       -e EMQX_LICENSE__KEY="${LICENSE_KEY}" \
-      -e EMQX_PLUGINS__STATES="[{enable = true, name_vsn = \"emqx_sdv_fanout-${PLUGIN_VSN}\"}]" \
+      -e EMQX_PLUGINS__STATES="[{enable = true, name_vsn = \"emqx_sdv-${PLUGIN_VSN}\"}]" \
       -v $(pwd)/_build/default/emqx_plugrel:/opt/emqx/plugins \
       "$IMAGE"
 }

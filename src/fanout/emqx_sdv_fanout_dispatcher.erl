@@ -21,7 +21,7 @@
     code_change/3
 ]).
 
--include("emqx_sdv_fanout.hrl").
+-include("emqx_sdv.hrl").
 
 %% @doc Handle a batch received from SDV platform.
 batch(Payload) ->
@@ -101,7 +101,7 @@ insert_batch(VINs, RequestId, Data) ->
 
 notify_dispatchers(VINs) ->
     _ = proc_lib:spawn(fun() ->
-        set_label(sdv_fanout_dispatcher_notify_dispatchers),
+        set_label(sdv_fanout_notify_dispatchers),
         do_notify_dispatchers(VINs)
     end),
     ok.

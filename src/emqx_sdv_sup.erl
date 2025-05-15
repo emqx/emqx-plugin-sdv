@@ -2,7 +2,7 @@
 %% Copyright (c) 2025 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%--------------------------------------------------------------------
 
--module(emqx_sdv_fanout_sup).
+-module(emqx_sdv_sup).
 
 -behaviour(supervisor).
 
@@ -10,7 +10,7 @@
 
 -export([init/1]).
 
--include("emqx_sdv_fanout.hrl").
+-include("emqx_sdv.hrl").
 
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
@@ -23,12 +23,12 @@ init([]) ->
         period => 10
     },
     ConfigChildSpec = #{
-        id => emqx_sdv_fanout,
-        start => {emqx_sdv_fanout, start_link, []},
+        id => emqx_sdv,
+        start => {emqx_sdv, start_link, []},
         restart => permanent,
         shutdown => 5000,
         type => worker,
-        modules => [emqx_sdv_fanout]
+        modules => [emqx_sdv]
     },
     PoolModule = ?DISPATCHER_POOL,
     PoolType = hash,
@@ -41,7 +41,7 @@ init([]) ->
 
 resolve_pool_size() ->
     %% Get config from emqx_plugin_helper, but not from
-    %% emqx_sdv_fanout_config because it's not initialized yet
+    %% emqx_sdv_config because it's not initialized yet
     Config = emqx_plugin_helper:get_config(?PLUGIN_NAME_VSN),
     ConfigedSize = maps:get(<<"dispatcher_pool_size">>, Config),
     resolve_pool_size(ConfigedSize).

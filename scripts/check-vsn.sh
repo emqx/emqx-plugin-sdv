@@ -7,7 +7,7 @@ erl -noshell -eval \
   {erl_opts, ErlOpts} = lists:keyfind(erl_opts, 1, Conf),
   {d, plugin_rel_vsn, Vsn1} = lists:keyfind(plugin_rel_vsn, 2, ErlOpts),
   {relx, RelxConf} = lists:keyfind(relx, 1, Conf),
-  {release, {emqx_sdv_fanout, Vsn2}, _} = lists:keyfind(release, 1, RelxConf),
+  {release, {emqx_sdv, Vsn2}, _} = lists:keyfind(release, 1, RelxConf),
   case Vsn1 == Vsn2 of
     true ->
       halt(0);

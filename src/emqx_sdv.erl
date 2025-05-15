@@ -2,7 +2,7 @@
 %% Copyright (c) 2025 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%--------------------------------------------------------------------
 
--module(emqx_sdv_fanout).
+-module(emqx_sdv).
 
 %% for #message{} record
 %% no need for this include if we call emqx_message:to_map/1 to convert it to a map
@@ -14,7 +14,7 @@
 %% for logging
 -include_lib("emqx_plugin_helper/include/logger.hrl").
 
--include("emqx_sdv_fanout.hrl").
+-include("emqx_sdv.hrl").
 
 -export([
     hook/0,
@@ -133,8 +133,8 @@ on_health_check(_Options) ->
 %%   Here we use `gen_server:cast/2` to react on changes. The cast will be silently
 %%   ignored if the plugin is not running.
 on_config_changed(_OldConfig, NewConfig) ->
-    Parsed = emqx_sdv_fanout_config:parse(NewConfig),
-    emqx_sdv_fanout_config:put(Parsed),
+    Parsed = emqx_sdv_config:parse(NewConfig),
+    emqx_sdv_config:put(Parsed),
     ok = gen_server:cast(?MODULE, {on_changed, Parsed}).
 
 %%--------------------------------------------------------------------
@@ -149,7 +149,7 @@ start_link() ->
 init([]) ->
     erlang:process_flag(trap_exit, true),
     Config = emqx_plugin_helper:get_config(?PLUGIN_NAME_VSN),
-    emqx_sdv_fanout_config:put(Config),
+    emqx_sdv_config:put(Config),
     {ok, Config}.
 
 handle_call(_Request, _From, State) ->

@@ -2,13 +2,13 @@
 %% Copyright (c) 2025 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%--------------------------------------------------------------------
 
--module(emqx_sdv_fanout_config).
+-module(emqx_sdv_config).
 
 -compile({no_auto_import, [get/0, put/1]}).
 -export([get/0, put/1, parse/1]).
 -export([get_data_retention/0]).
 
--include("emqx_sdv_fanout.hrl").
+-include("emqx_sdv.hrl").
 
 -spec get() -> map().
 get() ->

@@ -2,11 +2,11 @@
 %% Copyright (c) 2025 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%--------------------------------------------------------------------
 
--module(emqx_sdv_fanout_cli).
+-module(emqx_sdv_cli).
 
 -export([cmd/1]).
 
--include("emqx_sdv_fanout.hrl").
+-include("emqx_sdv.hrl").
 
 cmd(["show-config" | More]) ->
     emqx_ctl:print("~ts~n", [get_config(More)]);
@@ -28,7 +28,7 @@ get_config(["origin" | MaybeJSON]) ->
             hocon_pp:do(Config)
     end;
 get_config(["inuse" | MaybeJSON]) ->
-    Config = emqx_sdv_fanout_config:get(),
+    Config = emqx_sdv_config:get(),
     case MaybeJSON of
         "--json" ->
             emqx_utils_json:encode(Config);

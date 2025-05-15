@@ -54,5 +54,5 @@ jobs:
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
-        files: _build/default/emqx_plugrel/emqx_sdv_fanout-*.tar.gz
+        files: _build/default/emqx_plugrel/emqx_sdv-*.tar.gz
         generate_release_notes: true

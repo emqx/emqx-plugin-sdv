@@ -1,7 +1,7 @@
--ifndef(EMQX_SDV_FANOUT_HRL).
--define(EMQX_SDV_FANOUT_HRL, true).
+-ifndef(EMQX_SDV_HRL).
+-define(EMQX_SDV_HRL, true).
 
--define(PLUGIN_NAME, "emqx_sdv_fanout").
+-define(PLUGIN_NAME, "emqx_sdv").
 -define(PLUGIN_VSN, ?plugin_rel_vsn).
 -define(PLUGIN_NAME_VSN, <<?PLUGIN_NAME, "-", ?PLUGIN_VSN>>).
 
@@ -36,7 +36,7 @@
     ref :: ref_key()
 }).
 
--define(DB_SHARD, sdv_fanout_shard).
+-define(DB_SHARD, sdv_shard).
 
 -include_lib("emqx_plugin_helper/include/logger.hrl").
 -define(LOGTAG, "SDV_FANOUT").
