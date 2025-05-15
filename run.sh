@@ -164,8 +164,8 @@ wait_for_running_nodes() {
     while [ "${wait_sec}" -lt "${wait_limit}" ]; do
         running_nodes="$(docker exec -t "$container" emqx ctl cluster status --json | jq '.running_nodes | length')"
         if [ "${running_nodes}" -eq "${expected_running_nodes}" ]; then
-            echo "Successfully confirmed ${running_nodes} running nodes"
-            exit 0
+            echo "Successfully confirmed ${running_nodes} running nodes."
+            return
         fi
         if [ "$wait_sec" -gt "$wait_limit" ]; then
             echo "Expected running nodes is ${expected_running_nodes}, but got ${running_nodes} after ${wait_limit} seconds"
@@ -188,3 +188,30 @@ docker exec "${NODE2}" emqx ctl cluster join "emqx@$NODE1"
 docker exec "${NODE3}" emqx ctl cluster join "emqx@$NODE1"
 
 wait_for_running_nodes "$NODE3" "3" 30
+
+validate_plugin() {
+    local container="$1"
+    local plugin_info
+    plugin_info=$(docker exec -t "$container" emqx ctl plugins list | jq -r '.[] | select(.name == "emqx_sdv")')
+    if [ -z "$plugin_info" ]; then
+        echo "Error: Plugin emqx_sdv not found in node $container"
+        exit 1
+    fi
+    local plugin_vsn
+    plugin_vsn=$(echo "$plugin_info" | jq -r '.rel_vsn')
+    if [ "$plugin_vsn" != "$PLUGIN_VSN" ]; then
+        echo "Error: Plugin version mismatch. Expected $PLUGIN_VSN but got $plugin_vsn in node $container"
+        exit 1
+    fi
+    local running_status
+    running_status=$(echo "$plugin_info" | jq -r '.running_status')
+    if [ "$running_status" != "running" ]; then
+        echo "Error: Plugin is not running. Current status: $running_status in node $container"
+        exit 1
+    fi
+}
+
+validate_plugin "$NODE1"
+validate_plugin "$NODE2"
+validate_plugin "$NODE3"
+echo "Plugin emqx_sdv-${PLUGIN_VSN} is running in all nodes."
