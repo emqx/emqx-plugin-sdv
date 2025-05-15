@@ -8,7 +8,7 @@ REBAR = $(CURDIR)/rebar3
 SCRIPTS = $(CURDIR)/scripts
 
 .PHONY: all
-all: compile
+all: rel
 
 .PHONY: ensure-rebar3
 ensure-rebar3:
@@ -48,3 +48,11 @@ rel: $(REBAR)
 .PHONY: fmt
 fmt: $(REBAR)
 	$(REBAR) fmt --verbose -w
+
+.PHONY: fmt-check
+fmt-check: $(REBAR)
+	$(REBAR) fmt --verbose --check
+
+.PHONY: run
+run: rel
+	./scripts/run.sh emqx/emqx-enterprise:5.9.0

@@ -1,0 +1,30 @@
+{
+  "type": "record",
+  "name": "ExtendedConfig",
+  "fields": [
+    {
+      "name": "dispatcher_pool_size",
+      "type": "int",
+      "default": 0,
+      "$ui": {
+        "component": "input",
+        "flex": 12,
+        "required": false,
+        "label": "$dispatcher_pool_size_label",
+        "description": "$dispatcher_pool_size_desc"
+      }
+    },
+    {
+      "name": "data_retention",
+      "type": "string",
+      "default": "7d",
+      "$ui": {
+        "component": "input",
+        "flex": 12,
+        "required": false,
+        "label": "$data_retention_label",
+        "description": "$data_retention_desc"
+      }
+    }
+  ]
+}
