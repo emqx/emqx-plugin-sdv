@@ -31,10 +31,10 @@ trigger(Payload) ->
             notify_dispatchers(VINs),
             ok;
         _ ->
-            {error, invalid_payload}
+            {error, #{cause => invalid_payload}}
     catch
         _:_ ->
-            {error, invalid_payload}
+            {error, #{cause => invalid_payload}}
     end.
 
 %% @doc Handle an ACK received from a vehicle.

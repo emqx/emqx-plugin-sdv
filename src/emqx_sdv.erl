@@ -84,7 +84,7 @@ on_message_publish(#message{topic = <<?SDV_FANOUT_TRIGGER_TOPIC>>, payload = Pay
         ok ->
             {stop, Message#message{headers = Headers#{allow_publish => false}}};
         {error, Reason} ->
-            %% Fail loud by disconnecting the client.
+            %% Fail loudly by disconnecting the client.
             %% If SDV platform prefers to get a PUBACK with a reason code,
             %% we can add a message header and here and use the header
             %% in 'message.puback' hook callback.
@@ -121,27 +121,12 @@ on_delivery_completed(#message{topic = Topic}, _) ->
 %% @doc
 %% - Return `{error, Error}' if the health check fails.
 %% - Return `ok' if the health check passes.
-%%
-%% NOTE
-%% For demonstration, we consider any port number other than 3306 unavailable.
 on_health_check(_Options) ->
     ok.
 
 %% @doc
 %% - Return `{error, Error}' if the new config is invalid.
 %% - Return `ok' if the config is valid and can be accepted.
-%%
-%% NOTE
-%% We validate only the client_regex field here. Other config fields are present
-%% only for the demonstration purposes.
-%%
-%% NOTE
-%% Take the following considerations into account when writing the validating callback:
-%% * You should not make validations depending on the environment, e.g.
-%%   check network connection, file system, etc.
-%% * The callback may be called even if the application is not running.
-%%   Here we use `gen_server:cast/2` to react on changes. The cast will be silently
-%%   ignored if the plugin is not running.
 on_config_changed(_OldConfig, NewConfig) ->
     Parsed = emqx_sdv_config:parse(NewConfig),
     emqx_sdv_config:put(Parsed),

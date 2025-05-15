@@ -108,6 +108,19 @@ t_disconnected_session_does_not_receive_dispatch(_Config) ->
         ok = stop_client(PubPid)
     end.
 
+t_non_json_payload_causes_disconnect(_Config) ->
+    test_invalid_trigger_payload(<<"not json">>).
+
+t_invalid_payload_causes_disconnect(_Config) ->
+    test_invalid_trigger_payload(<<"{\"ids\": [\"vin-1\"]}">>).
+
+test_invalid_trigger_payload(Payload) ->
+    {ok, PubPid} = start_batch_publisher(),
+    unlink(PubPid),
+    TriggerTopic = <<"$SDV-FANOUT/trigger">>,
+    QoS = 1,
+    ?assertMatch({error, {disconnected, _, _}}, emqtt:publish(PubPid, TriggerTopic, Payload, QoS)).
+
 assert_payload_received([], _RequestId, _Data) ->
     ok;
 assert_payload_received(SubPids, RequestId, Data) ->
