@@ -45,12 +45,14 @@ The `sdv_fanout_data` and `sdv_fanout_ids` table will be deleted if the timestam
 
 This plugin starts a pool of dispatcher processes to fanout the data to the locally connected subscribers.
 
+The data is published to EMQX from SDV platform to the topic `$SDV-FANOUT/data/<data_id>`, and the batch fanout-trigger is published to the topic `$SDV-FANOUT/trigger`.
+
 Below are the events which will trigger the fanout to the subscribers:
 
 ### Dispatch Triggers
 
-- **Batch Received**:
-  When a new batch is received, the publishing client will trigger the fanout data (and IDs) to be written to the database, then send notification to the dispatcher pool.  Depending on the session lookup result (pid), the notification `{maybe_send, new_batch, Pid, VIN}` should be sent to a dispatcher in the pool or an `rpc` call to a remote node to do the same.
+- **Batch Trigger Received**:
+  When a new batch trigger is received, the publishing client will trigger the and IDs to be written to the database, then send notification to the dispatcher pool. Depending on the session lookup result (pid), the notification `{maybe_send, new_batch, Pid, VIN}` will be sent to a dispatcher in the pool or an `rpc` call to a remote node to do the same.
 - **Heartbeat**:
   After connected, the vehicle publishes to topic `ecp/${VIN}/online`, then it periodically (every 1m) publishes to the topic `ecp/${VIN}/heartbeat`. The plugin implemented callback (`'message.publish'`) should trigger a `{maybe_send, heartbeat, Pid, VIN}` notification to the dispatcher pool. This is to ensure messages are sent to the vehicle even if other triggers missed due to race conditions. For example, after client session resume it may not observe the new batch being inserted in another node, and the new batch handler in the other node may not see the session being online, hence both nodes miss the opportunity to send the message. This heartbeat is to ensure the message is eventually sent.
 - **PUBACK Received**:

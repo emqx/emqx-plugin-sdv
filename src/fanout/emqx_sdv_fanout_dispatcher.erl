@@ -4,7 +4,7 @@
 
 -module(emqx_sdv_fanout_dispatcher).
 
--export([batch/1, ack/2, heartbeat/1]).
+-export([trigger/1, ack/2, heartbeat/1]).
 
 -export([start_link/2]).
 
@@ -23,12 +23,12 @@
 
 -include("emqx_sdv.hrl").
 
-%% @doc Handle a batch received from SDV platform.
-batch(Payload) ->
+%% @doc Handle a trigger received from SDV platform.
+trigger(Payload) ->
     try emqx_utils_json:decode(Payload, [return_maps]) of
-        #{<<"ids">> := VINs, <<"request_id">> := RequestId, <<"data">> := Data} ->
-            {ok, _ID} = insert_batch(VINs, RequestId, Data),
-            ok = notify_dispatchers(VINs),
+        #{<<"ids">> := VINs, <<"request_id">> := RequestId, <<"data_id">> := DataID} ->
+            insert_ids(VINs, RequestId, DataID),
+            notify_dispatchers(VINs),
             ok;
         _ ->
             {error, invalid_payload}
@@ -40,14 +40,14 @@ batch(Payload) ->
 %% @doc Handle an ACK received from a vehicle.
 ack(VIN, RequestId) ->
     case emqx_sdv_fanout_inflight:lookup(self()) of
-        {ok, RefKey} ->
+        {ok, RefKey, MRef} ->
             %% do the heavy lifting in the client process
             %% because mria:dirty_delete/2 may involve RPC
             %% to core nodes if running in a replica node
             ok = emqx_sdv_fanout_ids:delete(RefKey),
             %% find the dispatcher for the VIN and tell it to send the next message
             Dispatcher = gproc_pool:pick_worker(?DISPATCHER_POOL, VIN),
-            gen_server:cast(Dispatcher, ?ACKED(self(), RefKey));
+            gen_server:cast(Dispatcher, ?ACKED(self(), RefKey, MRef));
         {error, not_found} ->
             %% half-transmitted QoS 1 was retried, ignore for now, fix until someone screams
             %% TODO: scan the ids table for the VIN + RequestId and delete it
@@ -62,7 +62,7 @@ ack(VIN, RequestId) ->
 heartbeat(VIN) ->
     %% check if the VIN has any messages inflight or pending to be sent in the client process
     %% so to minimize the number or message passing to the dispatcher pool
-    case emqx_sdv_fanout_inflight:is_exist(self()) of
+    case emqx_sdv_fanout_inflight:exists(self()) of
         true ->
             %% there are inflight messages, do not notify the dispatcher
             %% because the client process will do it when the inflight messages are acknowledged
@@ -88,16 +88,14 @@ heartbeat(VIN) ->
             end
     end.
 
-insert_batch(VINs, RequestId, Data) ->
+insert_ids(VINs, RequestId, DataID) ->
     Now = now_ts(),
-    {ok, ID} = emqx_sdv_fanout_data:insert(Now, Data),
-    lists:foreach(fun(VIN) -> emqx_sdv_fanout_ids:insert(VIN, Now, RequestId, ID) end, VINs),
-    ?LOG(debug, "insert_new_batch", #{
+    lists:foreach(fun(VIN) -> emqx_sdv_fanout_ids:insert(VIN, Now, RequestId, DataID) end, VINs),
+    ?LOG(debug, "insert_new_vins_for_fanout", #{
         vin => VINs,
         request_id => RequestId,
-        data_id => ID
-    }),
-    {ok, ID}.
+        data_id => DataID
+    }).
 
 notify_dispatchers(VINs) ->
     _ = proc_lib:spawn(fun() ->
@@ -134,12 +132,12 @@ do_notify_dispatchers([VIN | VINs]) ->
 notify_dispatcher_if_vehicle_online(Pid, VIN, Trigger) when node(Pid) =:= node() ->
     %% Do not trigger a send if the client is offline or has inflight messages
     IsConnected = emqx_cm:is_channel_connected(Pid),
-    HasInflightMessages = emqx_sdv_fanout_inflight:is_exist(Pid),
+    HasInflightMessages = emqx_sdv_fanout_inflight:exists(Pid),
     case IsConnected andalso not HasInflightMessages of
         true ->
             do_notify_dispatcher(Pid, VIN, Trigger);
         false ->
-            ?LOG(debug, "client_offline_or_inflight_messages", #{
+            ?LOG(debug, "skip_notify_dispatcher", #{
                 vin => VIN,
                 trigger => Trigger,
                 is_connected => IsConnected,
@@ -179,13 +177,15 @@ handle_cast(?MAYBE_SEND(_Trigger, SubPid, _VIN_Or_RefKey) = Continue, State) ->
     %% this check is needed to avoid race condition:
     %% caller observed no inflight message while
     %% the dispatcher is sending the message.
-    case emqx_sdv_fanout_inflight:is_exist(SubPid) of
+    case emqx_sdv_fanout_inflight:exists(SubPid) of
         true ->
             {noreply, State};
         false ->
             {noreply, State, {continue, Continue}}
     end;
-handle_cast(?ACKED(SubPid, RefKey), State) ->
+handle_cast(?ACKED(SubPid, RefKey, MRef), State) ->
+    %% no flush, stale DOWN message does no harm
+    _ = erlang:demonitor(MRef),
     emqx_sdv_fanout_inflight:delete(SubPid),
     Continue = ?MAYBE_SEND(?TRG_ACKED, SubPid, RefKey),
     {noreply, State, {continue, Continue}};
@@ -194,10 +194,13 @@ handle_cast(_Msg, State) ->
 
 handle_continue(?MAYBE_SEND(Trigger, SubPid, VIN_Or_RefKey), #{id := Id} = State) ->
     %% continue to send the next message (if any)
+    %% we cannot always start from VIN, because the dirty delete
+    %% in a replicant node may lag, causing the same message
+    %% to be dispatched again
     case maybe_send(Trigger, SubPid, VIN_Or_RefKey, Id) of
         {ok, RefKey} ->
-            _ = erlang:monitor(process, SubPid),
-            emqx_sdv_fanout_inflight:insert(SubPid, RefKey);
+            MRef = erlang:monitor(process, SubPid),
+            emqx_sdv_fanout_inflight:insert(SubPid, RefKey, MRef);
         ignore ->
             ok
     end,

@@ -37,8 +37,8 @@ next(?REF_KEY(VIN, _Ts, _RequestId) = RefKey) ->
     case mnesia:dirty_next(?ID_TAB, RefKey) of
         ?REF_KEY(VIN1, _Ts1, _RequestId1) = NextKey when VIN1 =:= VIN ->
             case mnesia:dirty_read(?ID_TAB, NextKey) of
-                [#?ID_REC{key = NextKey, data_id = ID}] ->
-                    {ok, {NextKey, ID}};
+                [#?ID_REC{key = NextKey, data_id = DataID}] ->
+                    {ok, {NextKey, DataID}};
                 [] ->
                     %% race condition, the record is deleted while we are reading it
                     {error, empty}

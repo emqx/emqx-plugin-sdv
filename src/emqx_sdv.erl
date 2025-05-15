@@ -41,7 +41,8 @@
     terminate/2
 ]).
 
--define(SDV_FANOUT_TOPIC, <<"$SDV-FANOUT">>).
+-define(SDV_FANOUT_DATA_TOPIC, "$SDV-FANOUT/data").
+-define(SDV_FANOUT_TRIGGER_TOPIC, "$SDV-FANOUT/trigger").
 
 %% @doc
 %% Called when the plugin application start
@@ -69,9 +70,17 @@ unhook() ->
 
 %% @doc
 %% Called when a message is published by the SDV platform.
-on_message_publish(#message{topic = ?SDV_FANOUT_TOPIC, payload = Payload} = Message) ->
+on_message_publish(
+    #message{
+        timestamp = Ts, topic = <<?SDV_FANOUT_DATA_TOPIC, $/, DataID/binary>>, payload = Payload
+    } = Message
+) ->
     Headers = Message#message.headers,
-    case emqx_sdv_fanout_dispatcher:batch(Payload) of
+    ok = emqx_sdv_fanout_data:insert_new(DataID, Payload, Ts),
+    {stop, Message#message{headers = Headers#{allow_publish => false}}};
+on_message_publish(#message{topic = <<?SDV_FANOUT_TRIGGER_TOPIC>>, payload = Payload} = Message) ->
+    Headers = Message#message.headers,
+    case emqx_sdv_fanout_dispatcher:trigger(Payload) of
         ok ->
             {stop, Message#message{headers = Headers#{allow_publish => false}}};
         {error, Reason} ->

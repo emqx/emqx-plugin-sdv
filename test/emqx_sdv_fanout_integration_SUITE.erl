@@ -153,12 +153,15 @@ mqtt_endpoint() ->
     end.
 
 publish_batch(Pid, VINs) ->
-    Topic = <<"$SDV-FANOUT">>,
+    DataID = integer_to_binary(erlang:system_time(millisecond)),
+    DataTopic = bin(["$SDV-FANOUT/data/", DataID]),
+    TriggerTopic = <<"$SDV-FANOUT/trigger">>,
     QoS = 1,
-    Data = base64:encode(crypto:strong_rand_bytes(1024)),
+    Data = crypto:strong_rand_bytes(1024),
     RequestId = integer_to_binary(erlang:system_time(millisecond)),
-    Payload = emqx_utils_json:encode(#{ids => VINs, request_id => RequestId, data => Data}),
-    {ok, _} = emqtt:publish(Pid, Topic, Payload, QoS),
+    Trigger = emqx_utils_json:encode(#{ids => VINs, request_id => RequestId, data_id => DataID}),
+    {ok, _} = emqtt:publish(Pid, DataTopic, Data, QoS),
+    {ok, _} = emqtt:publish(Pid, TriggerTopic, Trigger, QoS),
     {ok, {RequestId, Data}}.
 
 %% Start a number of vehicle clients which subscribes to the topic

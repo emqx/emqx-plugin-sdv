@@ -7,7 +7,7 @@
 -export([
     create_tables/0,
     exists/1,
-    insert/2,
+    insert_new/3,
     read/1
 ]).
 
@@ -21,38 +21,43 @@ create_tables() ->
         {storage, disc_copies},
         {record_name, ?DATA_REC},
         {attributes, record_info(fields, ?DATA_REC)}
+    ]),
+    ok = mria:create_table(?META_TAB, [
+        {type, ordered_set},
+        {rlog_shard, ?DB_SHARD},
+        {storage, disc_copies},
+        {record_name, ?META_REC},
+        {attributes, record_info(fields, ?META_REC)}
     ]).
 
-%% @doc Hot path, do not insert unless it's new.
-insert(Ts, Data) ->
-    Sha1 = crypto:hash(sha, Data),
-    case exists(Sha1) of
+%% @doc Overwrite metadata if data exists, otherwise insert new data.
+-spec insert_new(DataID :: binary(), Data :: binary(), Ts :: erlang:timestamp()) -> ok.
+insert_new(DataID, Data, Ts) ->
+    MetaRec = #?META_REC{data_id = DataID, meta = #{ts => Ts}},
+    DataRec = #?DATA_REC{data_id = DataID, data = Data},
+    case exists(DataID) of
         true ->
-            ok;
+            mria:dirty_write(?META_TAB, MetaRec);
         false ->
-            mria:dirty_write(?DATA_TAB, #?DATA_REC{id = Sha1, ts = Ts, data = Data})
+            mria:dirty_write(?META_TAB, MetaRec),
+            mria:dirty_write(?DATA_TAB, DataRec)
     end,
-    {ok, Sha1}.
+    ok.
 
-%% @doc Hot path, avoid reading body from disk when checking its existence.
-exists(Sha1) ->
-    case mnesia:dirty_next(?DATA_TAB, pseudo_prev(Sha1)) of
-        Sha1 ->
+%% @doc Check if data exists.
+exists(DataID) ->
+    case mnesia:dirty_read(?META_TAB, DataID) of
+        [_] ->
             true;
         _ ->
             false
     end.
 
 %% @doc Read the data from disk.
-read(Sha1) ->
-    case mnesia:dirty_read(?DATA_TAB, Sha1) of
+read(DataID) ->
+    case mnesia:dirty_read(?DATA_TAB, DataID) of
         [#?DATA_REC{data = Data}] ->
             {ok, Data};
         [] ->
             {error, not_found}
     end.
-
-pseudo_prev(Sha1) when is_binary(Sha1) ->
-    Len = byte_size(Sha1) - 1,
-    <<Prev:Len/binary, _/binary>> = Sha1,
-    Prev.
