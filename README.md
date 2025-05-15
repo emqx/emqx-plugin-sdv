@@ -72,6 +72,10 @@ If there is no message in flight, the dispatcher will read the `sdv_fanout_ids` 
 
 If a `'DOWN'` message is received from the subscriber, the dispatcher will remove the subscriber from the inflight table. The next `maybe_send` notification will be sent to the dispatcher pool after the vehicle reconnects and send heartbeat again.
 
+## Security Considerations
+
+Topics matching `$SDV-FANOUT/#` should only be allowed by SDV platform fanout message publishers. ACL rules should be added to ensure this.
+
 ## TODO
 
 - [ ] Garbage collection for the fanout ids and data.
