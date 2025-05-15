@@ -18,7 +18,7 @@ create_tables() ->
     ok = mria:create_table(?ID_TAB, [
         {type, ordered_set},
         {rlog_shard, ?DB_SHARD},
-        {storage, ram_copies},
+        {storage, disc_copies},
         {record_name, ?ID_REC},
         {attributes, record_info(fields, ?ID_REC)}
     ]).
@@ -32,7 +32,7 @@ insert(VIN, Ts, RequestId, DataID) when
 %% @doc Get the next RefKey and DataID for a VIN or the last-seen RefKey.
 -spec next(Key :: binary() | ref_key()) -> {ok, {ref_key(), DataID :: binary()}} | {error, empty}.
 next(VIN) when is_binary(VIN) ->
-    next(seudo_prev(VIN));
+    next(pseudo_prev(VIN));
 next(?REF_KEY(VIN, _Ts, _RequestId) = RefKey) ->
     case mnesia:dirty_next(?ID_TAB, RefKey) of
         ?REF_KEY(VIN1, _Ts1, _RequestId1) = NextKey when VIN1 =:= VIN ->
@@ -56,5 +56,5 @@ delete(RefKey) ->
 
 %% A pseudo previous key for the given VIN.
 %% Next is guaranteed to be the first key of the given VIN.
-seudo_prev(VIN) ->
+pseudo_prev(VIN) ->
     ?REF_KEY(VIN, 0, <<>>).

@@ -261,7 +261,7 @@ maybe_send2(Trigger, SubPid, RefKey, DataID, DispatcherId) ->
 
 deliver_to_subscriber(SubPid, VIN, RequestId, Data, DispatcherId) ->
     Topic = <<"agent/", VIN/binary, "/proxy/request/", RequestId/binary>>,
-    From = seudo_clientid(DispatcherId),
+    From = pseudo_clientid(DispatcherId),
     Qos = 1,
     Message = emqx_message:make(From, Qos, Topic, Data),
     erlang:send(SubPid, {deliver, Topic, Message}),
@@ -271,5 +271,5 @@ deliver_to_subscriber(SubPid, VIN, RequestId, Data, DispatcherId) ->
     }),
     ok.
 
-seudo_clientid(DispatcherId) ->
+pseudo_clientid(DispatcherId) ->
     iolist_to_binary(["sdv-fanout-dispatcher-", integer_to_binary(DispatcherId)]).

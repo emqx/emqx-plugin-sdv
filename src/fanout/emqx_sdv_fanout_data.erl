@@ -18,7 +18,7 @@ create_tables() ->
     ok = mria:create_table(?DATA_TAB, [
         {type, ordered_set},
         {rlog_shard, ?DB_SHARD},
-        {storage, ram_copies},
+        {storage, disc_copies},
         {record_name, ?DATA_REC},
         {attributes, record_info(fields, ?DATA_REC)}
     ]).
@@ -36,7 +36,7 @@ insert(Ts, Data) ->
 
 %% @doc Hot path, avoid reading body from disk when checking its existence.
 exists(Sha1) ->
-    case mnesia:dirty_next(?DATA_TAB, seudo_prev(Sha1)) of
+    case mnesia:dirty_next(?DATA_TAB, pseudo_prev(Sha1)) of
         Sha1 ->
             true;
         _ ->
@@ -52,7 +52,7 @@ read(Sha1) ->
             {error, not_found}
     end.
 
-seudo_prev(Sha1) when is_binary(Sha1) ->
+pseudo_prev(Sha1) when is_binary(Sha1) ->
     Len = byte_size(Sha1) - 1,
     <<Prev:Len/binary, _/binary>> = Sha1,
     Prev.
