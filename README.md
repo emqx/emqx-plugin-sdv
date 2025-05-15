@@ -16,11 +16,16 @@ Then it will fanout the messages to the corresponding VINs in a reactive manner.
 
 ## Data Format
 
-The messages published from SDV platform are in JSON format with the following fields:
+SDV platform publishes messages to below topics:
 
-`ids`: Array of VINs
+- `$SDV-FANOUT/data/<data_id>`: The data to be fanouted to the corresponding subscribers.
+- `$SDV-FANOUT/trigger`: The fanout-trigger indicating a batch of VINs to be fanouted to.
+
+The trigger messages is in JSON format with the following fields:
+
+`ids`: Array of VINs to be fanouted to.
 `request_id`: `task_{tasktype}_{per-type-number}`, per-type-number is finite. e.g. (1-10)
-`data`: Transparent binary blob (maybe compressed) to be fanouted to the corresponding subscribers as MQTT message payload.
+`data_id`: The unique ID of the data to be fanouted to the corresponding subscribers.
 
 ## Data Storage
 
@@ -43,8 +48,6 @@ This plugin runs periodic garbage collection to delete from `sdv_fanout_data` an
 
 This plugin starts a pool of dispatcher processes to fanout the data to the locally connected subscribers.
 
-The data is published to EMQX from SDV platform to the topic `$SDV-FANOUT/data/<data_id>`, and the batch fanout-trigger is published to the topic `$SDV-FANOUT/trigger`.
-
 Below are the events which will trigger the fanout to the subscribers:
 
 ### Dispatch Triggers
@@ -54,7 +57,7 @@ Below are the events which will trigger the fanout to the subscribers:
 - **Heartbeat**:
   After connected, the vehicle publishes to topic `ecp/${VIN}/online`, then it periodically (every 1m) publishes to the topic `ecp/${VIN}/heartbeat`. The plugin implemented callback (`'message.publish'`) should trigger a `{maybe_send, heartbeat, Pid, VIN}` notification to the dispatcher pool. This is to ensure messages are sent to the vehicle even if other triggers missed due to race conditions. For example, after client session resume it may not observe the new batch being inserted in another node, and the new batch handler in the other node may not see the session being online, hence both nodes miss the opportunity to send the message. This heartbeat is to ensure the message is eventually sent.
 - **PUBACK Received**:
-  When a `PUBACK` is received, the plugin implemented callback (`'delivery.completed'`) should delete the message ID from the `sdv_fanout_ids` table, and trigger a `{acknowledge, self(), RequestID}` notification to the dispatcher pool.
+  When a `PUBACK` is received, the plugin implemented callback (`'delivery.completed'`) should delete the message ID from the `sdv_fanout_ids` table, and trigger an `acknowledged` notification to the dispatcher pool so the dispatcher can remove the old references and move on to the next message.
 
 ### Dispatch Process
 
