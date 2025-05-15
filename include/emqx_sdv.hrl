@@ -5,7 +5,7 @@
 -define(PLUGIN_VSN, ?plugin_rel_vsn).
 -define(PLUGIN_NAME_VSN, <<?PLUGIN_NAME, "-", ?PLUGIN_VSN>>).
 
-%% mnesia_rocksdb
+%% mnesia
 -define(ID_TAB, sdv_fanout_ids).
 -define(DATA_TAB, sdv_fanout_data).
 %% ets

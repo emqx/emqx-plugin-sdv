@@ -3,7 +3,7 @@
 This EMQX plugin is to implement message fanout for EMQ SDV platform.
 The messages are published from SDV platform with a batch of VINs for each request (identified by a unique RequestID).
 
-This plugin will receive the messages and store them in mnesia (rocksdb) tables.
+This plugin will receive the messages and store them in mnesia tables.
 Then it will fanout the messages to the corresponding VINs in a reactive manner.
 
 <img src="overview.png" alt="Overview" width="600">
@@ -18,7 +18,7 @@ The messages published from SDV platform are in JSON format with the following f
 
 ## Data Storage
 
-The data is stored in two mnesia (rocksdb) tables.
+The data is stored in two mnesia tables.
 
 `sdv_fanout_data`: Key is the `sha1` of the data, value is the timestamp and the binary data itself.
 `sdv_fanout_ids`: Key is a composite key of `vin` and `request_id`, value is the timestamp and the `sha1` of the data.
