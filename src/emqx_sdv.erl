@@ -84,9 +84,10 @@ on_message_publish(#message{topic = <<?SDV_FANOUT_TRIGGER_TOPIC>>, payload = Pay
         ok ->
             {stop, Message#message{headers = Headers#{allow_publish => false}}};
         {error, Reason} ->
-            %% Disconnect the client, this seems to be the only way to notify the client
-            %% about the error, as EMQX message.publish hook does not support returning
-            %% PUBACK reason codes.
+            %% Fail loud by disconnecting the client.
+            %% If SDV platform prefers to get a PUBACK with a reason code,
+            %% we can add a message header and here and use the header
+            %% in 'message.puback' hook callback.
             ?LOG(error, "failed_to_handle_batch_will_disconnect", Reason),
             {stop, Message#message{headers = Headers#{should_disconnect => true}}}
     end;
