@@ -66,7 +66,6 @@ If a `'DOWN'` message is received from the subscriber, the dispatcher will remov
 
 ## TODO
 
-- [ ] Add a configuration for the fanout data retention period.
 - [ ] Garbage collection for the fanout ids and data.
 - [ ] Configuration for vehicle subscription topic pattern.
 - [ ] Check vehicle subscription existence before sending message.

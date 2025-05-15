@@ -24,8 +24,7 @@
 
 -export([
     on_config_changed/2,
-    on_health_check/1,
-    get_config/0
+    on_health_check/1
 ]).
 
 %% Hook callbacks
@@ -134,17 +133,13 @@ on_health_check(_Options) ->
 %%   Here we use `gen_server:cast/2` to react on changes. The cast will be silently
 %%   ignored if the plugin is not running.
 on_config_changed(_OldConfig, NewConfig) ->
-    %% TODO: Validate NewConfig
-    ok = gen_server:cast(?MODULE, {on_changed, NewConfig}).
+    Parsed = emqx_sdv_fanout_config:parse(NewConfig),
+    emqx_sdv_fanout_config:put(Parsed),
+    ok = gen_server:cast(?MODULE, {on_changed, Parsed}).
 
 %%--------------------------------------------------------------------
 %% Working with config
 %%--------------------------------------------------------------------
-
-%% @doc
-%% Efficiently get the current config.
-get_config() ->
-    persistent_term:get(?MODULE, #{}).
 
 %% gen_server callbacks
 
@@ -154,17 +149,14 @@ start_link() ->
 init([]) ->
     erlang:process_flag(trap_exit, true),
     Config = emqx_plugin_helper:get_config(?PLUGIN_NAME_VSN),
-    persistent_term:put(?MODULE, Config),
-    {ok, #{}}.
+    emqx_sdv_fanout_config:put(Config),
+    {ok, Config}.
 
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
-handle_cast({on_changed, Config}, State) ->
-    persistent_term:put(?MODULE, Config),
-    %% NOTE
-    %% additionally handling of the config change here, i.e
-    %% reestablish the connection to the database in case of host change, etc.
+handle_cast({on_changed, _ParsedConfig}, State) ->
+    %% So far, no stateful operations neeeded for config changes
     {noreply, State};
 handle_cast(_Request, State) ->
     {noreply, State}.

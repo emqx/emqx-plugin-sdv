@@ -1,3 +1,6 @@
 # The number of workers to start for the dispatcher pool.
 # 0 means to use the number of Erlang scheduler as pool size
 dispatcher_pool_size = 0
+
+# The retention period of fanout data
+data_retention = "7d"

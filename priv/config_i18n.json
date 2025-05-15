@@ -6,5 +6,14 @@
   "$dispatcher_pool_size_desc": {
     "zh": "扇出工作进程的进程池大小。默认值 0 表示与系统可用调度器数量一样。增大进程池可以增加消息扇出的并发量。",
     "en": "The size of fanout worker process pool. The default value 0 means to use the number of Erlang schedulers. Greater number means it can perform more fanout work concurrently."
+  },
+  "$data_retention_label": {
+    "zh": "数据保留时间",
+    "en": "Data Retention"
+  },
+  "$data_retention_desc": {
+    "zh": "数据保留时间。默认值 7d。",
+    "en": "The retention period of fanout data. The default value is 7d."
   }
 }
+

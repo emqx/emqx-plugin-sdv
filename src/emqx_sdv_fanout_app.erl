@@ -26,7 +26,7 @@ start(_StartType, _StartArgs) ->
     ok = mria:wait_for_tables([?ID_TAB, ?DATA_TAB]),
     {ok, Sup} = emqx_sdv_fanout_sup:start_link(),
     emqx_sdv_fanout:hook(),
-    emqx_ctl:register_command(emqx_sdv_fanout, {emqx_sdv_fanout_cli, cmd}),
+    emqx_ctl:register_command(sdv, {emqx_sdv_fanout_cli, cmd}),
     {ok, Sup}.
 
 stop(_State) ->

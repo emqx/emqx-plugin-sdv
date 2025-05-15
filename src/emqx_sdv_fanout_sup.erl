@@ -40,6 +40,8 @@ init([]) ->
     {ok, {SupFlags, [ConfigChildSpec, PoolSupSpec]}}.
 
 resolve_pool_size() ->
+    %% Get config from emqx_plugin_helper, but not from
+    %% emqx_sdv_fanout_config because it's not initialized yet
     Config = emqx_plugin_helper:get_config(?PLUGIN_NAME_VSN),
     ConfigedSize = maps:get(<<"dispatcher_pool_size">>, Config),
     resolve_pool_size(ConfigedSize).
