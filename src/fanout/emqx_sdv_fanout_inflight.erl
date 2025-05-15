@@ -19,7 +19,7 @@ create_tables() ->
     ets:new(?INFLIGHT_TAB, [
         public,
         named_table,
-        ordered_set,
+        set,
         {keypos, #?INFLIGHT_REC.pid},
         {write_concurrency, true},
         {read_concurrency, true}
