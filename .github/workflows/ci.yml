@@ -48,7 +48,7 @@ jobs:
     - name: Setup Erlang
       uses: erlef/setup-beam@v1
       with:
-        otp-version: "27"
+        otp-version: "26"
         rebar3-version: "3"
 
     - name: Build Release
