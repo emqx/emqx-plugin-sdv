@@ -42,7 +42,7 @@ parse(<<"dispatcher_pool_size">>, Size) ->
 to_duration_ms(Str) ->
     case hocon_postprocess:duration(Str) of
         D when is_number(D) ->
-            ceiling(D);
+            erlang:ceil(D);
         _ ->
             case to_integer(Str) of
                 I when is_integer(I) -> I;
@@ -50,15 +50,7 @@ to_duration_ms(Str) ->
             end
     end.
 
-ceiling(X) ->
-    T = erlang:trunc(X),
-    case (X - T) of
-        Neg when Neg < 0 -> T;
-        Pos when Pos > 0 -> T + 1;
-        _ -> T
-    end.
-
-to_integer(Str) ->
+to_integer(Str) when is_binary(Str) ->
     case string:to_integer(Str) of
         {Int, <<>>} -> Int;
         _ -> error
