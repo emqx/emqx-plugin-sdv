@@ -8,7 +8,8 @@
     create_tables/0,
     insert/4,
     next/1,
-    delete/1
+    delete/1,
+    gc/3
 ]).
 
 -include("emqx_sdv.hrl").
@@ -58,3 +59,21 @@ delete(RefKey) ->
 %% Next is guaranteed to be the first key of the given VIN.
 pseudo_prev(VIN) ->
     ?REF_KEY(VIN, 0, <<>>).
+
+%% @doc Delete expired IDs.
+gc(?GC_BEGIN, ScanLimit, ExpiredAt) ->
+    Next = mnesia:dirty_first(?ID_TAB),
+    gc(Next, ScanLimit, ExpiredAt);
+gc('$end_of_table', _ScanLimit, _ExpiredAt) ->
+    complete;
+gc(Key, 0, _ExpiredAt) ->
+    {continue, Key};
+gc(?REF_KEY(_VIN, Ts, _RequestId) = Key, ScanLimit, ExpiredAt) ->
+    case Ts =< ExpiredAt of
+        true ->
+            delete(Key);
+        false ->
+            ok
+    end,
+    Next = mnesia:dirty_next(?ID_TAB, Key),
+    gc(Next, ScanLimit - 1, ExpiredAt).

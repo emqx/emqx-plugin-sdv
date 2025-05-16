@@ -47,7 +47,14 @@ rel: $(REBAR)
 
 .PHONY: fmt
 fmt: $(REBAR)
-	$(REBAR) fmt --verbose -w
+	@find . \( -name '*.app.src' -o \
+	-name '*.erl' -o \
+	-name '*.hrl' -o \
+	-name 'rebar.config' -o \
+	-name '*.eterm' -o \
+	-name '*.escript' \) \
+	-not -path '*/_build/*' \
+	-type f | xargs $(SCRIPTS)/erlfmt -w
 
 .PHONY: fmt-check
 fmt-check: $(REBAR)

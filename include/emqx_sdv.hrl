@@ -63,4 +63,6 @@
 -define(TRG_ACKED, vehicle_ack).
 -define(ACKED(SubPid, RefKey, MRef), {?TRG_ACKED, SubPid, RefKey, MRef}).
 
+-define(GC_BEGIN, gc_begin).
+
 -endif.
