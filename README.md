@@ -79,7 +79,6 @@ Topics matching `$SDV-FANOUT/#` should only be allowed by SDV platform fanout me
 
 ## TODO
 
-- [ ] Garbage collection for the fanout ids and data.
 - [ ] Configuration for vehicle subscription topic pattern.
 - [ ] Check vehicle subscription existence before sending message.
 - [ ] CLI to inspect the fanout ids and data.

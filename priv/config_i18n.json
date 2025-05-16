@@ -14,6 +14,14 @@
   "$data_retention_desc": {
     "zh": "数据保留时间。默认值 7d。",
     "en": "The retention period of fanout data. The default value is 7d."
+  },
+  "$gc_interval_label": {
+    "zh": "垃圾回收间隔",
+    "en": "Garbage Collection Interval"
+  },
+  "$gc_interval_desc": {
+    "zh": "垃圾回收间隔。默认值 1h。",
+    "en": "The interval between garbage collection runs. The default value is 1h."
   }
 }
 

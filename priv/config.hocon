@@ -4,3 +4,6 @@ dispatcher_pool_size = 0
 
 # The retention period of fanout data
 data_retention = "7d"
+
+# The interval between garbage collection runs
+gc_interval = "1h"

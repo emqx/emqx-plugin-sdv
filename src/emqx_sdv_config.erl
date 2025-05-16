@@ -18,6 +18,10 @@ get() ->
 put(Parsed) ->
     persistent_term:put(?MODULE, Parsed).
 
+%% @doc Parse the config.
+%% Avro schema does certain validation for the config,
+%% but we still need to convert the config to the internal format
+%% and also some extra validation like value range check.
 -spec parse(map()) -> map().
 parse(Config) ->
     maps:fold(
@@ -29,12 +33,22 @@ parse(Config) ->
         Config
     ).
 
+%% @doc Get the data retention period.
+%% Duration in milliseconds.
 -spec get_data_retention() -> integer().
 get_data_retention() ->
     maps:get(data_retention, get()).
 
+%% @doc Get the garbage collection interval.
+%% Duration in milliseconds.
+-spec get_gc_interval() -> integer().
+get_gc_interval() ->
+    maps:get(gc_interval, get()).
+
 parse(<<"data_retention">>, Str) ->
     {data_retention, to_duration_ms(Str)};
+parse(<<"gc_interval">>, Str) ->
+    {gc_interval, to_duration_ms(Str)};
 parse(<<"dispatcher_pool_size">>, Size) ->
     (Size < 0 orelse Size > 10240) andalso throw("invalid_dispatcher_pool_size"),
     {dispatcher_pool_size, Size}.

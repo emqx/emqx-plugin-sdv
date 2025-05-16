@@ -8,7 +8,9 @@ parse_test_() ->
         ?_assertEqual(#{data_retention => 10000}, parse(#{<<"data_retention">> => <<"10000">>})),
         ?_assertEqual(#{data_retention => 10000}, parse(#{<<"data_retention">> => <<"10000ms">>})),
         ?_assertEqual(#{data_retention => 10000}, parse(#{<<"data_retention">> => 9999.9})),
-        ?_assertEqual(#{data_retention => 10000}, parse(#{<<"data_retention">> => 9999.1}))
+        ?_assertEqual(#{data_retention => 10000}, parse(#{<<"data_retention">> => 9999.1})),
+        ?_assertEqual(#{gc_interval => 3600000}, parse(#{<<"gc_interval">> => <<"1h">>})),
+        ?_assertEqual(#{gc_interval => 3600000}, parse(#{<<"gc_interval">> => 3600000}))
     ].
 
 parse(Config) ->
