@@ -61,19 +61,19 @@ pseudo_prev(VIN) ->
     ?REF_KEY(VIN, 0, <<>>).
 
 %% @doc Delete expired IDs.
-gc(?GC_BEGIN, ScanLimit, ExpiredAt) ->
+gc(?GC_BEGIN, ScanLimit, ExpireAt) ->
     Next = mnesia:dirty_first(?ID_TAB),
-    gc(Next, ScanLimit, ExpiredAt);
-gc('$end_of_table', _ScanLimit, _ExpiredAt) ->
+    gc(Next, ScanLimit, ExpireAt);
+gc('$end_of_table', _ScanLimit, _ExpireAt) ->
     complete;
-gc(Key, 0, _ExpiredAt) ->
+gc(Key, 0, _ExpireAt) ->
     {continue, Key};
-gc(?REF_KEY(_VIN, Ts, _RequestId) = Key, ScanLimit, ExpiredAt) ->
-    case Ts =< ExpiredAt of
+gc(?REF_KEY(_VIN, Ts, _RequestId) = Key, ScanLimit, ExpireAt) ->
+    case Ts =< ExpireAt of
         true ->
             delete(Key);
         false ->
             ok
     end,
     Next = mnesia:dirty_next(?ID_TAB, Key),
-    gc(Next, ScanLimit - 1, ExpiredAt).
+    gc(Next, ScanLimit - 1, ExpireAt).

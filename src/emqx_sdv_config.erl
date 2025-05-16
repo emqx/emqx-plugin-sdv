@@ -6,7 +6,7 @@
 
 -compile({no_auto_import, [get/0, put/1]}).
 -export([get/0, put/1, parse/1]).
--export([get_data_retention/0]).
+-export([get_data_retention/0, get_gc_interval/0]).
 
 -include("emqx_sdv.hrl").
 
