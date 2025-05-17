@@ -30,6 +30,14 @@ init([]) ->
         type => worker,
         modules => [emqx_sdv]
     },
+    GcChildSpec = #{
+        id => emqx_sdv_fanout_gc,
+        start => {emqx_sdv_fanout_gc, start_link, []},
+        restart => permanent,
+        shutdown => 5000,
+        type => worker,
+        modules => [emqx_sdv_fanout_gc]
+    },
     PoolModule = ?DISPATCHER_POOL,
     PoolType = hash,
     PoolSize = resolve_pool_size(),
@@ -37,7 +45,7 @@ init([]) ->
     Pool = PoolModule,
     SupArgs = [Pool, PoolType, PoolSize, MFA],
     PoolSupSpec = emqx_pool_sup:spec(emqx_sdv_fanout_dispatcher_sup, SupArgs),
-    {ok, {SupFlags, [ConfigChildSpec, PoolSupSpec]}}.
+    {ok, {SupFlags, [ConfigChildSpec, PoolSupSpec, GcChildSpec]}}.
 
 resolve_pool_size() ->
     %% Get config from emqx_plugin_helper, but not from

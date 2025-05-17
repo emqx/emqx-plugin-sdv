@@ -10,8 +10,10 @@
 
 cmd(["show-config" | More]) ->
     emqx_ctl:print("~ts", [format_config(More)]);
+cmd(["gc"]) ->
+    emqx_sdv_fanout_gc:run();
 cmd(_) ->
-    emqx_ctl:usage([usage("show-config")]).
+    emqx_ctl:usage(usages()).
 
 format_config([]) ->
     format_config(["origin"]);
@@ -33,9 +35,17 @@ format_config(["inuse" | MaybeJSON]) ->
     end;
 format_config(Args) ->
     emqx_ctl:print("bad args for show-config: ~p~n", [Args]),
-    emqx_ctl:usage([usage("show-config")]).
+    emqx_ctl:usage([usage(show_config)]).
 
-usage("show-config") ->
+usages() ->
+    [
+        usage(show_config),
+        usage(gc)
+    ].
+
+usage(show_config) ->
     {"show-config [origin|inuse] [--json]",
         "Show current config, 'origin' for original config, "
-        "'inuse' for in-use (parsed) config, add '--json' for JSON format."}.
+        "'inuse' for in-use (parsed) config, add '--json' for JSON format."};
+usage(gc) ->
+    {"gc", "Run garbage collection on local node immediately."}.

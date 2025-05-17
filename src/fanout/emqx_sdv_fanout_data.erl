@@ -8,7 +8,8 @@
     create_tables/0,
     exists/1,
     insert_new/3,
-    read/1
+    read/1,
+    gc/3
 ]).
 
 -include("emqx_sdv.hrl").
@@ -61,3 +62,30 @@ read(DataID) ->
         [] ->
             {error, not_found}
     end.
+
+%% @doc Delete expired data.
+%% Read timestamp form metadata table,
+%% and delete both metadata and data if expired.
+gc(?GC_BEGIN, ScanLimit, ExpireAt) ->
+    Next = mnesia:dirty_first(?META_TAB),
+    gc(Next, ScanLimit, ExpireAt);
+gc('$end_of_table', _ScanLimit, _ExpireAt) ->
+    complete;
+gc(Key, 0, _ExpireAt) ->
+    {continue, Key};
+gc(Key, ScanLimit, ExpireAt) ->
+    case mnesia:dirty_read(?META_TAB, Key) of
+        [#?META_REC{meta = #{ts := Ts}}] ->
+            case Ts =< ExpireAt of
+                true ->
+                    mria:dirty_delete(?DATA_TAB, Key),
+                    mria:dirty_delete(?META_TAB, Key);
+                false ->
+                    ok
+            end;
+        [] ->
+            %% Should never happen because gc is the only delete operation.
+            ok
+    end,
+    Next = mnesia:dirty_next(?META_TAB, Key),
+    gc(Next, ScanLimit - 1, ExpireAt).

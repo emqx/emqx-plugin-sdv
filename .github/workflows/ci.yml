@@ -23,6 +23,9 @@ jobs:
         otp-version: "27"
         rebar3-version: "3"
 
+    - name: Check Version
+      run: ./scripts/check-vsn.sh
+
     - name: Check format
       run: make fmt-check
 
