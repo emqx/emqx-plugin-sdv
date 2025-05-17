@@ -45,6 +45,7 @@ distclean:
 rel: $(REBAR)
 	$(REBAR) emqx_plugrel tar
 
+## 'rebar3 fmt -w' does not work with sub-dir in src
 .PHONY: fmt
 fmt: $(REBAR)
 	@find . \( -name '*.app.src' -o \
