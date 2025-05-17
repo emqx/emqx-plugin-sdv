@@ -6,7 +6,13 @@
 
 -compile({no_auto_import, [get/0, put/1]}).
 -export([get/0, put/1, parse/1]).
--export([get_data_retention/0, get_gc_interval/0]).
+
+%% Config getters
+-export([
+    get_data_retention/0,
+    get_gc_interval/0,
+    get_topic_prefix/0
+]).
 
 -include("emqx_sdv.hrl").
 
@@ -39,6 +45,11 @@ parse(Config) ->
 get_data_retention() ->
     maps:get(data_retention, get()).
 
+%% @doc Get the topic prefix.
+-spec get_topic_prefix() -> binary().
+get_topic_prefix() ->
+    maps:get(topic_prefix, get()).
+
 %% @doc Get the garbage collection interval.
 %% Duration in milliseconds.
 -spec get_gc_interval() -> integer().
@@ -51,7 +62,9 @@ parse(<<"gc_interval">>, Str) ->
     {gc_interval, to_duration_ms(Str)};
 parse(<<"dispatcher_pool_size">>, Size) ->
     (Size < 0 orelse Size > 10240) andalso throw("invalid_dispatcher_pool_size"),
-    {dispatcher_pool_size, Size}.
+    {dispatcher_pool_size, Size};
+parse(<<"topic_prefix">>, Str) ->
+    {topic_prefix, parse_topic_prefix(Str)}.
 
 to_duration_ms(Str) ->
     case hocon_postprocess:duration(Str) of
@@ -68,4 +81,11 @@ to_integer(Str) when is_binary(Str) ->
     case string:to_integer(Str) of
         {Int, <<>>} -> Int;
         _ -> error
+    end.
+
+%% Ensure the topic has placeholder '{VIN}'
+parse_topic_prefix(Str) ->
+    case string:find(Str, "{VIN}") of
+        nomatch -> throw("invalid_topic_prefix_pattern");
+        _ -> Str
     end.

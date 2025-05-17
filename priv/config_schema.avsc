@@ -37,6 +37,18 @@
         "label": "$gc_interval_label",
         "description": "$gc_interval_desc"
       }
+    },
+    {
+      "name": "topic_prefix",
+      "type": "string",
+      "default": "agent/{VIN}/proxy/request/",
+      "$ui": {
+        "component": "input",
+        "flex": 12,
+        "required": false,
+        "label": "$topic_prefix_label",
+        "description": "$topic_prefix_desc"
+      }
     }
   ]
 }

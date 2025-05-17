@@ -86,7 +86,7 @@ t_continue_gc_data_table(_Config) ->
         lists:foreach(
             fun(Msg) ->
                 receive
-                    {next, data,Msg} ->
+                    {next, data, Msg} ->
                         ok;
                     Other ->
                         error({unexpected_message, Other})
@@ -104,7 +104,7 @@ t_gc_ids_then_data(_Config) ->
     Tester = self(),
     meck:new(emqx_sdv_fanout_ids, [passthrough]),
     %% mock 10 iterations for ids table
-    meck:expect(emqx_sdv_fanout_ids, gc, gc_loop_fn(Tester, ids,10)),
+    meck:expect(emqx_sdv_fanout_ids, gc, gc_loop_fn(Tester, ids, 10)),
     meck:new(emqx_sdv_fanout_data, [passthrough]),
     %% mock 10 iterations for data
     meck:expect(emqx_sdv_fanout_data, gc, gc_loop_fn(Tester, data, 10)),
@@ -122,9 +122,8 @@ t_gc_ids_then_data(_Config) ->
                         ok;
                     Other ->
                         error({unexpected_message, Other})
-                after
-                    3000 ->
-                        error(timeout)
+                after 3000 ->
+                    error(timeout)
                 end
             end,
             ExpectedMsgs1 ++ ExpectedMsgs2

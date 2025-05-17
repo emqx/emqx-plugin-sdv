@@ -263,7 +263,7 @@ maybe_send2(Trigger, SubPid, RefKey, DataID, DispatcherId) ->
     end.
 
 deliver_to_subscriber(SubPid, VIN, RequestId, Data, DispatcherId) ->
-    Topic = <<"agent/", VIN/binary, "/proxy/request/", RequestId/binary>>,
+    Topic = render_topic(VIN, RequestId),
     From = pseudo_clientid(DispatcherId),
     Qos = 1,
     Message = emqx_message:make(From, Qos, Topic, Data),
@@ -274,5 +274,12 @@ deliver_to_subscriber(SubPid, VIN, RequestId, Data, DispatcherId) ->
     }),
     ok.
 
+render_topic(VIN, RequestId) ->
+    TopicPrefix = emqx_sdv_config:get_topic_prefix(),
+    bin([re:replace(TopicPrefix, "{VIN}", VIN, [global, {return, binary}]), RequestId]).
+
 pseudo_clientid(DispatcherId) ->
-    iolist_to_binary(["sdv-fanout-dispatcher-", integer_to_binary(DispatcherId)]).
+    bin(["sdv-fanout-dispatcher-", integer_to_binary(DispatcherId)]).
+
+bin(Iolist) ->
+    iolist_to_binary(Iolist).
