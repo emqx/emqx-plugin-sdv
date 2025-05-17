@@ -70,7 +70,8 @@ handle_info(?GC(Next), #{timer := OldTRef, next := Next} = State) ->
 handle_info(?GC(Next), State) ->
     ?LOG(warning, "ignored_gc_notification", #{next => Next, cause => running}),
     {noreply, State};
-handle_info(_Info, State) ->
+handle_info(Info, State) ->
+    ?LOG(warning, "ignored_unknown_message", #{info => Info}),
     {noreply, State}.
 
 %% @private
@@ -85,7 +86,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% @private
 schedule_gc() ->
     Interval = emqx_sdv_config:get_gc_interval(),
-    schedule_gc(Interval, ?GC_BEGIN).
+    schedule_gc(Interval, ?GC(?GC_BEGIN)).
 
 schedule_gc(Delay, Message) ->
     erlang:send_after(Delay, self(), Message).
