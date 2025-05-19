@@ -41,7 +41,7 @@ run() ->
         Pid when is_pid(Pid) ->
             erlang:send(Pid, ?GC(?GC_BEGIN));
         _ ->
-            ?LOG(error, "gc_worker_not_running", #{})
+            ok
     end,
     ok.
 
