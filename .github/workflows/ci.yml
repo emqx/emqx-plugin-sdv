@@ -55,7 +55,9 @@ jobs:
         rebar3-version: "3"
 
     - name: Build Release
-      run: make rel
+      run: |
+        ./scripts/check-vsn.sh
+        make rel
 
     - name: Create Release
       uses: softprops/action-gh-release@v1
