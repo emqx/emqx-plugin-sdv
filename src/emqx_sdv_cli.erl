@@ -60,12 +60,12 @@ get_status() ->
     }.
 
 usage(show_config) ->
-    {"show-config [origin|inuse] [--json]",
+    {"sdv show-config [origin|inuse] [--json]",
         "Show current config, 'origin' for original config,\n"
         "'inuse' for in-use (parsed) config, add '--json' for JSON format."};
 usage(gc) ->
-    {"gc",
+    {"sdv gc",
         "Run garbage collection on local node immediately.\n"
         "This command takes no effect on replicant nodes."};
 usage(status) ->
-    {"status", "Show the status of the fanout data."}.
+    {"sdv status", "Show the status of the fanout data."}.

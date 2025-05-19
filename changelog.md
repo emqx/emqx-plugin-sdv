@@ -1,3 +1,7 @@
+# 0.4.0
+
+- Added CLI `emqx ctl sdv status` to inspect fanout status.
+
 # 0.3.0
 
 - For each trigger notification (batch of VINs), group subscribers by EMQX node name,
