@@ -241,6 +241,20 @@ maybe_send(Trigger, SubPid, VIN_Or_RefKey, DispatcherId) ->
     end.
 
 maybe_send2(Trigger, SubPid, RefKey, DataID, DispatcherId) ->
+    ?REF_KEY(VIN, _Ts, _RequestId) = RefKey,
+    SubTopic = render_sub_topic(VIN),
+    case emqx_broker:subscribed(SubPid, SubTopic) of
+        true ->
+            maybe_send3(Trigger, SubPid, RefKey, DataID, DispatcherId);
+        false ->
+            ?LOG(debug, "vehicle_not_subscribed", #{
+                vin => VIN,
+                sub_topic => SubTopic
+            }),
+            ignore
+    end.
+
+maybe_send3(Trigger, SubPid, RefKey, DataID, DispatcherId) ->
     ?REF_KEY(VIN, _Ts, RequestId) = RefKey,
     case emqx_sdv_fanout_data:read(DataID) of
         {ok, Data} ->
@@ -263,7 +277,7 @@ maybe_send2(Trigger, SubPid, RefKey, DataID, DispatcherId) ->
     end.
 
 deliver_to_subscriber(SubPid, VIN, RequestId, Data, DispatcherId) ->
-    Topic = render_topic(VIN, RequestId),
+    Topic = render_pub_topic(VIN, RequestId),
     From = pseudo_clientid(DispatcherId),
     Qos = 1,
     Message = emqx_message:make(From, Qos, Topic, Data),
@@ -274,9 +288,16 @@ deliver_to_subscriber(SubPid, VIN, RequestId, Data, DispatcherId) ->
     }),
     ok.
 
+render_sub_topic(VIN) ->
+    render_topic(VIN, "+").
+
+render_pub_topic(VIN, RequestId) ->
+    render_topic(VIN, RequestId).
+
 render_topic(VIN, RequestId) ->
     TopicPrefix = emqx_sdv_config:get_topic_prefix(),
-    bin([re:replace(TopicPrefix, "{VIN}", VIN, [global, {return, binary}]), RequestId]).
+    [Prefix, Suffix] = binary:split(TopicPrefix, <<"{VIN}">>),
+    bin([Prefix, VIN, Suffix, "/", RequestId]).
 
 pseudo_clientid(DispatcherId) ->
     bin(["sdv-fanout-dispatcher-", integer_to_binary(DispatcherId)]).

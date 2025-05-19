@@ -28,8 +28,7 @@
     "en": "Topic Prefix Template"
   },
   "$topic_prefix_desc": {
-    "zh": "扇出数据的主题前缀模版。必须包含占位符 '{VIN}'。例如 'agent/{VIN}/proxy/request/' 表示车辆将订阅 'agent/{VIN}/proxy/+'，扇出数据将发布到主题 'agent/${VIN}/proxy/${REQ_ID}'。注意：如果请求 ID 作为主题层级，则以 '/' 结尾。",
-    "en": "Topic prefix template for fanout data. Must have placeholder '{VIN}'. For example 'agent/{VIN}/proxy/request/' means the vehicle will subscribe to 'agent/{VIN}/proxy/+' and the fanout data will be published to topic 'agent/${VIN}/proxy/${REQ_ID}'. Note: end with '/' if request ID is meant to be a topic level."
+    "zh": "扇出数据的主题前缀模版。必须包含占位符 '{VIN}'。例如 'agent/{VIN}/proxy/request' 表示车辆将订阅 'agent/{VIN}/proxy/+'，扇出数据将发布到主题 'agent/{VIN}/proxy/{REQ_ID}'。",
+    "en": "Topic prefix template for fanout data. Must have placeholder '{VIN}'. For example 'agent/{VIN}/proxy/request/' means the vehicle will subscribe to 'agent/{VIN}/proxy/+' and the fanout data will be published to topic 'agent/{VIN}/proxy/{REQ_ID}'."
   }
 }
-
