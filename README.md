@@ -82,4 +82,3 @@ Topics matching `$SDV-FANOUT/#` should only be allowed by SDV platform fanout me
 ## TODO
 
 - [ ] CLI to inspect the fanout ids and data.
-- [ ] Batch VINs in RPC call twoards remote nodes.

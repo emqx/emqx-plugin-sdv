@@ -1,3 +1,10 @@
+# 0.3.0
+
+- For each trigger notification (batch of VINs), group subscribers by EMQX node name,
+  so only one message is sent in RPC for connected vehicles.
+  For each node, group subscribers by dispatcher, so only one message is sent for
+  each dispatched process.
+
 # 0.2.1
 
 - Check subscription exists before sending the message to subscriber session.

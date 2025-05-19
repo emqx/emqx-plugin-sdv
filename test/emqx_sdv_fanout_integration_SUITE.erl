@@ -38,7 +38,7 @@ end_per_testcase(_Case, _Config) ->
 t_realtime_dispatch(_Config) ->
     %% Test with a unique set of VINs to avoid contamination from previous tests.
     UniqueId = erlang:system_time(millisecond),
-    VINs = [vin(UniqueId, I) || I <- lists:seq(1, 10)],
+    VINs = [vin(UniqueId, I) || I <- lists:seq(1, 100)],
     {ok, SubPids} = start_vehicle_clients(VINs),
     try
         {ok, PubPid} = start_batch_publisher(),

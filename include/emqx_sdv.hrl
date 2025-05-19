@@ -56,6 +56,7 @@
 
 -define(DISPATCHER_POOL, emqx_sdv_fanout_dispatcher).
 
+-define(NOTIFY_BATCH(Sessions), {notify_batch, Sessions}).
 -define(MAYBE_SEND(Trigger, SubPid, VIN_Or_RefKey), {maybe_send, Trigger, SubPid, VIN_Or_RefKey}).
 -define(TRG_NEW_BATCH, new_batch_received).
 -define(TRG_HEARTBEAT, vehicle_heartbeat).
