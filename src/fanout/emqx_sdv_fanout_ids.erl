@@ -12,6 +12,11 @@
     gc/3
 ]).
 
+-export([
+    count/0,
+    bytes/0
+]).
+
 -include("emqx_sdv.hrl").
 
 %% @doc Create the tables.
@@ -77,3 +82,11 @@ gc(?REF_KEY(_VIN, Ts, _RequestId) = Key, ScanLimit, ExpireAt) ->
     end,
     Next = mnesia:dirty_next(?ID_TAB, Key),
     gc(Next, ScanLimit - 1, ExpireAt).
+
+%% @doc Get the number of remaining messages to be sent to the vehicles.
+count() ->
+    mnesia:table_info(?ID_TAB, size).
+
+%% @doc Get the number of bytes used by the fanout data.
+bytes() ->
+    mnesia:table_info(?ID_TAB, memory) * erlang:system_info(wordsize).

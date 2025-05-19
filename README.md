@@ -78,7 +78,3 @@ If a `'DOWN'` message is received from the subscriber, the dispatcher will remov
 ## Security Considerations
 
 Topics matching `$SDV-FANOUT/#` should only be allowed by SDV platform fanout message publishers. ACL rules should be added to ensure this.
-
-## TODO
-
-- [ ] CLI to inspect the fanout ids and data.

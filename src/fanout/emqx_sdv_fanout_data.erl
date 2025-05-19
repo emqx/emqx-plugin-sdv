@@ -12,6 +12,11 @@
     gc/3
 ]).
 
+-export([
+    count/0,
+    bytes/0
+]).
+
 -include("emqx_sdv.hrl").
 
 %% @doc Create the tables.
@@ -89,3 +94,14 @@ gc(Key, ScanLimit, ExpireAt) ->
     end,
     Next = mnesia:dirty_next(?META_TAB, Key),
     gc(Next, ScanLimit - 1, ExpireAt).
+
+%% @doc Get the number of unique data copies.
+count() ->
+    mnesia:table_info(?DATA_TAB, size).
+
+%% @doc Get the number of bytes used by the fanout data.
+bytes() ->
+    #{
+        payload => mnesia:table_info(?DATA_TAB, memory) * erlang:system_info(wordsize),
+        meta => mnesia:table_info(?META_TAB, memory) * erlang:system_info(wordsize)
+    }.

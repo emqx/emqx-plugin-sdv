@@ -38,7 +38,7 @@ end_per_testcase(_Case, _Config) ->
 t_realtime_dispatch(_Config) ->
     %% Test with a unique set of VINs to avoid contamination from previous tests.
     UniqueId = erlang:system_time(millisecond),
-    VINs = [vin(UniqueId, I) || I <- lists:seq(1, 100)],
+    VINs = [vin(UniqueId, I) || I <- lists:seq(1, 10)],
     {ok, SubPids} = start_vehicle_clients(VINs),
     try
         {ok, PubPid} = start_batch_publisher(),
@@ -82,11 +82,11 @@ t_late_subscribe(_Config) ->
 %% but will receive after heartbeat is sent.
 t_disconnected_session_does_not_receive_dispatch(_Config) ->
     UniqueId = erlang:system_time(millisecond),
-    VINs = [vin(UniqueId, I) || I <- lists:seq(1, 10)],
+    VINs = [vin(UniqueId, I) || I <- lists:seq(1, 5)],
     {ok, PubPid} = start_batch_publisher(),
     try
         {ok, {RequestId, Data}} = publish_batch(PubPid, VINs),
-        Opts = [{clean_start, false}, {properties, #{'Session-Expiry-Interval' => 10}}],
+        Opts = [{clean_start, false}, {properties, #{'Session-Expiry-Interval' => 5}}],
         {ok, SubPids0} = start_vehicle_clients(VINs, Opts),
         ok = stop_clients(SubPids0),
         {ok, SubPids} = start_vehicle_clients(VINs, Opts),

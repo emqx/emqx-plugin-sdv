@@ -37,7 +37,12 @@ start_link() ->
 %% @doc Run garbage collection on local node immediately.
 %% Then restart the timer with the current interval from config.
 run() ->
-    erlang:send(?MODULE, ?GC(?GC_BEGIN)),
+    case whereis(?MODULE) of
+        Pid when is_pid(Pid) ->
+            erlang:send(Pid, ?GC(?GC_BEGIN));
+        _ ->
+            ?LOG(error, "gc_worker_not_running", #{})
+    end,
     ok.
 
 %% @private
@@ -58,25 +63,20 @@ handle_cast(_Msg, State) ->
 %% @private
 handle_info(?GC(Next), #{timer := OldTRef, next := Next, complete_runs := CompleteRuns} = State) ->
     %% only run gc on the core nodes
+    ?LOG(info, "gc_notification", #{next => Next}),
+    _ = erlang:cancel_timer(OldTRef),
     NewState =
-        case mria_config:whoami() =:= replicant of
-            true ->
-                State;
-            false ->
-                ?LOG(info, "gc_notification", #{next => Next}),
-                _ = erlang:cancel_timer(OldTRef),
-                case run_gc(Next) of
-                    complete ->
-                        Tref = schedule_gc(),
-                        State#{
-                            timer := Tref,
-                            next := ?GC_BEGIN,
-                            complete_runs := CompleteRuns + 1
-                        };
-                    {continue, NewNext} ->
-                        Tref = schedule_gc(?SCAN_DELAY, ?GC(NewNext)),
-                        State#{timer := Tref, next := NewNext}
-                end
+        case run_gc(Next) of
+            complete ->
+                Tref = schedule_gc(),
+                State#{
+                    timer := Tref,
+                    next := ?GC_BEGIN,
+                    complete_runs := CompleteRuns + 1
+                };
+            {continue, NewNext} ->
+                Tref = schedule_gc(?SCAN_DELAY, ?GC(NewNext)),
+                State#{timer := Tref, next := NewNext}
         end,
     {noreply, NewState};
 handle_info(?GC(Next), State) ->

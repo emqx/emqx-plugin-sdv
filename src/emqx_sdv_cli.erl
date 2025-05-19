@@ -12,6 +12,8 @@ cmd(["show-config" | More]) ->
     emqx_ctl:print("~ts", [format_config(More)]);
 cmd(["gc"]) ->
     emqx_sdv_fanout_gc:run();
+cmd(["status"]) ->
+    show_status();
 cmd(_) ->
     emqx_ctl:usage(usages()).
 
@@ -40,12 +42,30 @@ format_config(Args) ->
 usages() ->
     [
         usage(show_config),
-        usage(gc)
+        usage(gc),
+        usage(status)
     ].
+
+show_status() ->
+    emqx_ctl:print("~s~n", [emqx_utils_json:encode(get_status())]).
+
+get_status() ->
+    #{
+        remaining_messages => emqx_sdv_fanout_ids:count(),
+        unique_payloads => emqx_sdv_fanout_data:count(),
+        memory_usage => #{
+            index => emqx_sdv_fanout_ids:bytes(),
+            data => emqx_sdv_fanout_data:bytes()
+        }
+    }.
 
 usage(show_config) ->
     {"show-config [origin|inuse] [--json]",
-        "Show current config, 'origin' for original config, "
+        "Show current config, 'origin' for original config,\n"
         "'inuse' for in-use (parsed) config, add '--json' for JSON format."};
 usage(gc) ->
-    {"gc", "Run garbage collection on local node immediately."}.
+    {"gc",
+        "Run garbage collection on local node immediately.\n"
+        "This command takes no effect on replicant nodes."};
+usage(status) ->
+    {"status", "Show the status of the fanout data."}.
