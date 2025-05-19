@@ -1,3 +1,8 @@
+# 0.2.1
+
+- Check subscription exists before sending the message to subscriber session.
+  This should avoid indefinite wait for PUBACK if message dispatched before subscription is inserted.
+
 # 0.2.0
 
 - Add retention based garbage collection for pending fanouts.
@@ -5,4 +10,4 @@
 
 # 0.1.0
 
-- Basic functionality
+- aBasic functionality

@@ -41,7 +41,7 @@
     {
       "name": "topic_prefix",
       "type": "string",
-      "default": "agent/{VIN}/proxy/request/",
+      "default": "agent/{VIN}/proxy/request",
       "$ui": {
         "component": "input",
         "flex": 12,
