@@ -45,7 +45,14 @@ init([]) ->
     Pool = PoolModule,
     SupArgs = [Pool, PoolType, PoolSize, MFA],
     PoolSupSpec = emqx_pool_sup:spec(emqx_sdv_fanout_dispatcher_sup, SupArgs),
-    {ok, {SupFlags, [ConfigChildSpec, PoolSupSpec, GcChildSpec]}}.
+    Children =
+        case mria_config:whoami() of
+            core ->
+                [ConfigChildSpec, PoolSupSpec, GcChildSpec];
+            _ ->
+                [ConfigChildSpec, PoolSupSpec]
+        end,
+    {ok, {SupFlags, Children}}.
 
 resolve_pool_size() ->
     %% Get config from emqx_plugin_helper, but not from

@@ -35,6 +35,7 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 %% @doc Run garbage collection on local node immediately.
+%% Then restart the timer with the current interval from config.
 run() ->
     erlang:send(?MODULE, ?GC(?GC_BEGIN)),
     ok.
@@ -45,7 +46,7 @@ init(_Args) ->
     Interval = emqx_sdv_config:get_gc_interval(),
     InitialDelay = min(timer:minutes(30), Interval),
     TRef = schedule_gc(InitialDelay, ?GC(?GC_BEGIN)),
-    {ok, #{timer => TRef, next => ?GC_BEGIN}}.
+    {ok, #{timer => TRef, next => ?GC_BEGIN, complete_runs => 0}}.
 
 %% @private
 handle_call(_Request, _From, State) ->
@@ -54,19 +55,30 @@ handle_call(_Request, _From, State) ->
 %% @private
 handle_cast(_Msg, State) ->
     {noreply, State}.
-
 %% @private
-handle_info(?GC(Next), #{timer := OldTRef, next := Next} = State) ->
-    ?LOG(info, "gc_notification", #{next => Next}),
-    _ = erlang:cancel_timer(OldTRef),
-    case run_gc(Next) of
-        complete ->
-            Tref = schedule_gc(),
-            {noreply, State#{timer := Tref, next := ?GC_BEGIN}};
-        {continue, NewNext} ->
-            Tref = schedule_gc(?SCAN_DELAY, ?GC(NewNext)),
-            {noreply, State#{timer := Tref, next := NewNext}}
-    end;
+handle_info(?GC(Next), #{timer := OldTRef, next := Next, complete_runs := CompleteRuns} = State) ->
+    %% only run gc on the core nodes
+    NewState =
+        case mria_config:whoami() =:= replicant of
+            true ->
+                State;
+            false ->
+                ?LOG(info, "gc_notification", #{next => Next}),
+                _ = erlang:cancel_timer(OldTRef),
+                case run_gc(Next) of
+                    complete ->
+                        Tref = schedule_gc(),
+                        State#{
+                            timer := Tref,
+                            next := ?GC_BEGIN,
+                            complete_runs := CompleteRuns + 1
+                        };
+                    {continue, NewNext} ->
+                        Tref = schedule_gc(?SCAN_DELAY, ?GC(NewNext)),
+                        State#{timer := Tref, next := NewNext}
+                end
+        end,
+    {noreply, NewState};
 handle_info(?GC(Next), State) ->
     ?LOG(warning, "ignored_gc_notification", #{next => Next, cause => running}),
     {noreply, State};

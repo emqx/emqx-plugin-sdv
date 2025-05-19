@@ -211,7 +211,9 @@ handle_call(_Request, _From, State) ->
 
 handle_cast(?NOTIFY_BATCH(Sessions), State) ->
     %% Notified by SDV platform when a new fanout message is published
-    Continues = lists:map(fun({SubPid, VIN}) -> ?MAYBE_SEND(?TRG_NEW_BATCH, SubPid, VIN) end, Sessions),
+    Continues = lists:map(
+        fun({SubPid, VIN}) -> ?MAYBE_SEND(?TRG_NEW_BATCH, SubPid, VIN) end, Sessions
+    ),
     handle_batch(Continues, State);
 handle_cast(?MAYBE_SEND(_Trigger, _SubPid, _VIN_Or_RefKey) = Continue, State) ->
     %% Notified by vehicle client process itself when 'online' or 'heartbeat' is received
