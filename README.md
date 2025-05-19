@@ -81,6 +81,5 @@ Topics matching `$SDV-FANOUT/#` should only be allowed by SDV platform fanout me
 
 ## TODO
 
-- [ ] Check vehicle subscription existence before sending message.
 - [ ] CLI to inspect the fanout ids and data.
 - [ ] Batch VINs in RPC call twoards remote nodes.
