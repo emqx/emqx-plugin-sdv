@@ -130,7 +130,7 @@ partition_per_dispatcher(Sessions) ->
 partition_per_dispatcher([], Acc) ->
     maps:to_list(Acc);
 partition_per_dispatcher([{Pid, VIN} | Sessions], Acc) ->
-    case is_online_sub_idel(Pid, VIN) of
+    case is_online_sub_idle(Pid, VIN) of
         true ->
             Dispatcher = gproc_pool:pick_worker(?DISPATCHER_POOL, VIN),
             L = maps:get(Dispatcher, Acc, []),
@@ -173,7 +173,7 @@ notify_dispatchers_rpc_handler(Sessions) ->
 %% 2) has subscribed to the topic
 %% 3) has no inflight messages
 %% Otherwise, returns {false, Reason}
-is_online_sub_idel(Pid, VIN) when node(Pid) =:= node() ->
+is_online_sub_idle(Pid, VIN) when node(Pid) =:= node() ->
     Checks = [
         {fun() -> emqx_cm:is_channel_connected(Pid) end, not_connected},
         {fun() -> emqx_broker:subscribed(Pid, render_sub_topic(VIN)) end, not_subscribed},

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Run coammand emqx ctl sdv ...
+# Run command emqx ctl sdv ...
 # in the given node.
 # 1 for node1.emqx.io, 2 for node2.emqx.io, 3 for node3.emqx.io
 

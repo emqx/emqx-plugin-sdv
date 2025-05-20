@@ -21,4 +21,4 @@
 
 # 0.1.0
 
-- aBasic functionality
+- Basic functionality
