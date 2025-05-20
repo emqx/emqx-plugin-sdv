@@ -1,6 +1,6 @@
 {application, emqx_sdv, [
     {description, "EMQX plugin for SDV platform"},
-    {vsn, "0.1.0"},
+    {vsn, git},
     {modules, []},
     {registered, [emqx_sdv_sup]},
     {applications, [kernel, stdlib, emqx_plugin_helper]},

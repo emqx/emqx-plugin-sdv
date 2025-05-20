@@ -14,6 +14,21 @@
   "$data_retention_desc": {
     "zh": "数据保留时间。默认值 7d。",
     "en": "The retention period of fanout data. The default value is 7d."
+  },
+  "$gc_interval_label": {
+    "zh": "垃圾回收间隔",
+    "en": "Garbage Collection Interval"
+  },
+  "$gc_interval_desc": {
+    "zh": "垃圾回收间隔。默认值 1h。如果配置在运行时更新，将立即触发垃圾回收，并重新启动定时器。",
+    "en": "The interval between garbage collection runs. The default value is 1h. If this config is updated on the fly, an immediate garbage collection will be triggered, followed by a new timer with the new interval."
+  },
+  "$topic_prefix_label": {
+    "zh": "主题前缀模版",
+    "en": "Topic Prefix Template"
+  },
+  "$topic_prefix_desc": {
+    "zh": "扇出数据的主题前缀模版。必须包含占位符 '{VIN}'。例如 'agent/{VIN}/proxy/request' 表示车辆将订阅 'agent/{VIN}/proxy/+'，扇出数据将发布到主题 'agent/{VIN}/proxy/{REQ_ID}'。",
+    "en": "Topic prefix template for fanout data. Must have placeholder '{VIN}'. For example 'agent/{VIN}/proxy/request/' means the vehicle will subscribe to 'agent/{VIN}/proxy/+' and the fanout data will be published to topic 'agent/{VIN}/proxy/{REQ_ID}'."
   }
 }
-

@@ -8,7 +8,13 @@
     create_tables/0,
     insert/4,
     next/1,
-    delete/1
+    delete/1,
+    gc/3
+]).
+
+-export([
+    count/0,
+    bytes/0
 ]).
 
 -include("emqx_sdv.hrl").
@@ -58,3 +64,29 @@ delete(RefKey) ->
 %% Next is guaranteed to be the first key of the given VIN.
 pseudo_prev(VIN) ->
     ?REF_KEY(VIN, 0, <<>>).
+
+%% @doc Delete expired IDs.
+gc(?GC_BEGIN, ScanLimit, ExpireAt) ->
+    Next = mnesia:dirty_first(?ID_TAB),
+    gc(Next, ScanLimit, ExpireAt);
+gc('$end_of_table', _ScanLimit, _ExpireAt) ->
+    complete;
+gc(Key, 0, _ExpireAt) ->
+    {continue, Key};
+gc(?REF_KEY(_VIN, Ts, _RequestId) = Key, ScanLimit, ExpireAt) ->
+    case Ts =< ExpireAt of
+        true ->
+            delete(Key);
+        false ->
+            ok
+    end,
+    Next = mnesia:dirty_next(?ID_TAB, Key),
+    gc(Next, ScanLimit - 1, ExpireAt).
+
+%% @doc Get the number of remaining messages to be sent to the vehicles.
+count() ->
+    mnesia:table_info(?ID_TAB, size).
+
+%% @doc Get the number of bytes used by the fanout data.
+bytes() ->
+    mnesia:table_info(?ID_TAB, memory) * erlang:system_info(wordsize).

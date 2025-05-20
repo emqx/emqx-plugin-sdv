@@ -129,7 +129,20 @@ on_health_check(_Options) ->
 %% - Return `ok' if the config is valid and can be accepted.
 on_config_changed(_OldConfig, NewConfig) ->
     Parsed = emqx_sdv_config:parse(NewConfig),
+    Before = emqx_sdv_config:get_gc_interval(),
     emqx_sdv_config:put(Parsed),
+    After = emqx_sdv_config:get_gc_interval(),
+    case Before =:= After of
+        true ->
+            ok;
+        false ->
+            ?LOG(
+                info,
+                "gc_interval_changed_triggering_immediate_gc",
+                #{old_interval => Before, new_interval => After}
+            ),
+            emqx_sdv_fanout_gc:run()
+    end,
     ok = gen_server:cast(?MODULE, {on_changed, Parsed}).
 
 %%--------------------------------------------------------------------

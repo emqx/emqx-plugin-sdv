@@ -122,7 +122,7 @@ backend emqx_dashboard_back
     mode http
     server emqx-1 $NODE1:18083
     server emqx-2 $NODE2:18083
-
+    # server emqx-3 $NODE3:18083 # do not add replicant node API endpoint
 frontend emqx_tcp
     mode tcp
     option tcplog

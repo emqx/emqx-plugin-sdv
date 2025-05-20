@@ -4,3 +4,13 @@ dispatcher_pool_size = 0
 
 # The retention period of fanout data
 data_retention = "7d"
+
+# The interval between garbage collection runs
+gc_interval = "1h"
+
+# Topic prefix pattern for fanout data.
+# Must have placeholder '{VIN}'.
+# For example 'agent/{VIN}/proxy/request'
+# means the vehicle will subscribe to 'agent/{VIN}/proxy/+'
+# and the fanout data will be published as 'agent/${VIN}/proxy/${REQ_ID}'
+topic_prefix = "agent/{VIN}/proxy/request"

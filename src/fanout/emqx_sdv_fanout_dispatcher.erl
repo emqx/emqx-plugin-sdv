@@ -9,7 +9,7 @@
 -export([start_link/2]).
 
 %% RPC
--export([notify_dispatcher_if_vehicle_online/3]).
+-export([notify_dispatchers_rpc_handler/1]).
 
 -export([
     init/1,
@@ -76,8 +76,9 @@ heartbeat(VIN) ->
                 {ok, {_RefKey, _DataID}} ->
                     %% this is called by the vehicle client process itself,
                     %% so it's for sure online, directly notify the dispatcher
-                    %% i.e. no need to call notify_dispatcher_if_vehicle_online/3
-                    do_notify_dispatcher(self(), VIN, ?TRG_HEARTBEAT);
+                    Dispatcher = gproc_pool:pick_worker(?DISPATCHER_POOL, VIN),
+                    SubPid = self(),
+                    gen_server:cast(Dispatcher, ?MAYBE_SEND(?TRG_HEARTBEAT, SubPid, VIN));
                 {error, empty} ->
                     %% ignore if the VIN has no inflight messages
                     ?LOG(debug, "no_pending_messages_to_send", #{
@@ -97,62 +98,98 @@ insert_ids(VINs, RequestId, DataID) ->
         data_id => DataID
     }).
 
-notify_dispatchers(VINs) ->
-    _ = proc_lib:spawn(fun() ->
-        set_label(sdv_fanout_notify_dispatchers),
-        do_notify_dispatchers(VINs)
-    end),
-    ok.
+%% @private
+%% Group VINs by node. Returns a list of {Node, [{Pid, VIN}]} tuples.
+partition_per_node(VINs) ->
+    partition_per_node(VINs, #{}).
 
--if(?OTP_RELEASE >= 27).
-set_label(Label) ->
-    proc_lib:set_label(Label).
--else.
-set_label(_Label) ->
-    ok.
--endif.
-
-do_notify_dispatchers([]) ->
-    ok;
-do_notify_dispatchers([VIN | VINs]) ->
+partition_per_node([], Acc) ->
+    maps:to_list(Acc);
+partition_per_node([VIN | VINs], Acc) ->
     case emqx_cm:lookup_channels(VIN) of
         [Pid] ->
-            notify_dispatcher_if_vehicle_online(Pid, VIN, ?TRG_NEW_BATCH);
-        _ ->
-            %% If no channel is found, ignore because the client is not connected
-            %% If more than one channel is found, ignore because the client
-            %% is in the middle of session takeover/resumption
+            L = maps:get(node(Pid), Acc, []),
+            partition_per_node(VINs, maps:put(node(Pid), [{Pid, VIN} | L], Acc));
+        [_, _ | _] ->
+            %% ignore if the VIN is subscribed to more than one session
+            %% because the client is in the middle of session takeover/resumption
             %% or the client is in a zombie state caused stale channels lingering
-            ?LOG(debug, "no_session_found", #{vin => VIN}),
-            ok
-    end,
-    do_notify_dispatchers(VINs).
+            %% either case, delay the notification until the client is stable
+            ?LOG(debug, "dispatch_ignored_due_to_multiple_sessions", #{vin => VIN}),
+            partition_per_node(VINs, Acc);
+        [] ->
+            ?LOG(debug, "dispatch_ignored_due_to_no_session", #{vin => VIN}),
+            partition_per_node(VINs, Acc)
+    end.
 
-%% @doc Notify the dispatcher of a new message.
-notify_dispatcher_if_vehicle_online(Pid, VIN, Trigger) when node(Pid) =:= node() ->
-    %% Do not trigger a send if the client is offline or has inflight messages
-    IsConnected = emqx_cm:is_channel_connected(Pid),
-    HasInflightMessages = emqx_sdv_fanout_inflight:exists(Pid),
-    case IsConnected andalso not HasInflightMessages of
+%% @private
+%% Group sessions by dispatcher. Returns a list of {Dispatcher, [{Pid, VIN}]} tuples.
+partition_per_dispatcher(Sessions) ->
+    partition_per_dispatcher(Sessions, #{}).
+
+partition_per_dispatcher([], Acc) ->
+    maps:to_list(Acc);
+partition_per_dispatcher([{Pid, VIN} | Sessions], Acc) ->
+    case is_online_sub_idle(Pid, VIN) of
         true ->
-            do_notify_dispatcher(Pid, VIN, Trigger);
-        false ->
-            ?LOG(debug, "skip_notify_dispatcher", #{
-                vin => VIN,
-                trigger => Trigger,
-                is_connected => IsConnected,
-                has_inflight_messages => HasInflightMessages
-            }),
-            ok
-    end;
-notify_dispatcher_if_vehicle_online(Pid, VIN, Trigger) ->
+            Dispatcher = gproc_pool:pick_worker(?DISPATCHER_POOL, VIN),
+            L = maps:get(Dispatcher, Acc, []),
+            partition_per_dispatcher(Sessions, maps:put(Dispatcher, [{Pid, VIN} | L], Acc));
+        {false, Reason} ->
+            ?LOG(debug, "dispatch_ignored", #{vin => VIN, reason => Reason}),
+            partition_per_dispatcher(Sessions, Acc)
+    end.
+
+notify_dispatchers(VINs) ->
+    Sessions = partition_per_node(VINs),
+    notify_dispatchers_per_node(Sessions).
+
+notify_dispatchers_per_node([]) ->
+    ok;
+notify_dispatchers_per_node([{Node, Sessions} | Rest]) when node() =:= Node ->
+    ok = notify_dispatchers_local(Sessions),
+    notify_dispatchers_per_node(Rest);
+notify_dispatchers_per_node([{Node, Sessions} | Rest]) ->
     %% the client is not on this node, RPC to the remote node
     %% and the remote node will notify the dispatcher
-    emqx_rpc:cast(node(Pid), ?MODULE, notify_dispatcher_if_vehicle_online, [Pid, VIN, Trigger]).
+    _ = emqx_rpc:cast(Node, ?MODULE, notify_dispatchers_rpc_handler, [Sessions]),
+    notify_dispatchers_per_node(Rest).
 
-do_notify_dispatcher(Pid, VIN, Trigger) ->
-    Dispatcher = gproc_pool:pick_worker(?DISPATCHER_POOL, VIN),
-    gen_server:cast(Dispatcher, ?MAYBE_SEND(Trigger, Pid, VIN)).
+notify_dispatchers_local(Sessions) ->
+    Dispatchers = partition_per_dispatcher(Sessions),
+    lists:foreach(
+        fun({DispatcherPid, SessionsPerDispatcher}) ->
+            gen_server:cast(DispatcherPid, ?NOTIFY_BATCH(SessionsPerDispatcher))
+        end,
+        Dispatchers
+    ).
+
+notify_dispatchers_rpc_handler(Sessions) ->
+    notify_dispatchers_local(Sessions).
+
+%% @private
+%% Returns 'true' if the client is
+%% 1) online
+%% 2) has subscribed to the topic
+%% 3) has no inflight messages
+%% Otherwise, returns {false, Reason}
+is_online_sub_idle(Pid, VIN) when node(Pid) =:= node() ->
+    Checks = [
+        {fun() -> emqx_cm:is_channel_connected(Pid) end, not_connected},
+        {fun() -> emqx_broker:subscribed(Pid, render_sub_topic(VIN)) end, not_subscribed},
+        {fun() -> not emqx_sdv_fanout_inflight:exists(Pid) end, pending_on_ack}
+    ],
+    check(Checks).
+
+check([]) ->
+    true;
+check([{Check, Reason} | Checks]) ->
+    case Check() of
+        true ->
+            check(Checks);
+        false ->
+            {false, Reason}
+    end.
 
 now_ts() ->
     erlang:system_time(millisecond).
@@ -172,18 +209,17 @@ init([Pool, Id]) ->
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
-handle_cast(?MAYBE_SEND(_Trigger, SubPid, _VIN_Or_RefKey) = Continue, State) ->
-    %% check if there is already an inflight message
-    %% this check is needed to avoid race condition:
-    %% caller observed no inflight message while
-    %% the dispatcher is sending the message.
-    case emqx_sdv_fanout_inflight:exists(SubPid) of
-        true ->
-            {noreply, State};
-        false ->
-            {noreply, State, {continue, Continue}}
-    end;
+handle_cast(?NOTIFY_BATCH(Sessions), State) ->
+    %% Notified by SDV platform when a new fanout message is published
+    Continues = lists:map(
+        fun({SubPid, VIN}) -> ?MAYBE_SEND(?TRG_NEW_BATCH, SubPid, VIN) end, Sessions
+    ),
+    handle_batch(Continues, State);
+handle_cast(?MAYBE_SEND(_Trigger, _SubPid, _VIN_Or_RefKey) = Continue, State) ->
+    %% Notified by vehicle client process itself when 'online' or 'heartbeat' is received
+    handle_batch([Continue], State);
 handle_cast(?ACKED(SubPid, RefKey, MRef), State) ->
+    %% Notified by vehicle client process itself when 'PUBACK' is received
     %% no flush, stale DOWN message does no harm
     _ = erlang:demonitor(MRef),
     emqx_sdv_fanout_inflight:delete(SubPid),
@@ -218,6 +254,21 @@ terminate(_Reason, #{pool := Pool, id := Id}) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+handle_batch([], State) ->
+    {noreply, State};
+handle_batch([?MAYBE_SEND(_Trigger, SubPid, _VIN_Or_RefKey) = Continue | More], State) ->
+    %% check if there is already an inflight message
+    %% this check is needed to avoid race condition:
+    %% caller observed no inflight message while
+    %% the dispatcher is sending the message.
+    case emqx_sdv_fanout_inflight:exists(SubPid) of
+        true ->
+            handle_batch(More, State);
+        false ->
+            {noreply, NewState} = handle_continue(Continue, State),
+            handle_batch(More, NewState)
+    end.
+
 %% @doc Send the next message to the client process.
 %% Returns ok if the message is sent.
 %% Returns ignore if there is no message to send.
@@ -241,6 +292,20 @@ maybe_send(Trigger, SubPid, VIN_Or_RefKey, DispatcherId) ->
     end.
 
 maybe_send2(Trigger, SubPid, RefKey, DataID, DispatcherId) ->
+    ?REF_KEY(VIN, _Ts, _RequestId) = RefKey,
+    SubTopic = render_sub_topic(VIN),
+    case emqx_broker:subscribed(SubPid, SubTopic) of
+        true ->
+            maybe_send3(Trigger, SubPid, RefKey, DataID, DispatcherId);
+        false ->
+            ?LOG(debug, "vehicle_not_subscribed", #{
+                vin => VIN,
+                sub_topic => SubTopic
+            }),
+            ignore
+    end.
+
+maybe_send3(Trigger, SubPid, RefKey, DataID, DispatcherId) ->
     ?REF_KEY(VIN, _Ts, RequestId) = RefKey,
     case emqx_sdv_fanout_data:read(DataID) of
         {ok, Data} ->
@@ -263,7 +328,7 @@ maybe_send2(Trigger, SubPid, RefKey, DataID, DispatcherId) ->
     end.
 
 deliver_to_subscriber(SubPid, VIN, RequestId, Data, DispatcherId) ->
-    Topic = <<"agent/", VIN/binary, "/proxy/request/", RequestId/binary>>,
+    Topic = render_pub_topic(VIN, RequestId),
     From = pseudo_clientid(DispatcherId),
     Qos = 1,
     Message = emqx_message:make(From, Qos, Topic, Data),
@@ -274,5 +339,19 @@ deliver_to_subscriber(SubPid, VIN, RequestId, Data, DispatcherId) ->
     }),
     ok.
 
+render_sub_topic(VIN) ->
+    render_topic(VIN, "+").
+
+render_pub_topic(VIN, RequestId) ->
+    render_topic(VIN, RequestId).
+
+render_topic(VIN, RequestId) ->
+    TopicPrefix = emqx_sdv_config:get_topic_prefix(),
+    [Prefix, Suffix] = binary:split(TopicPrefix, <<"{VIN}">>),
+    bin([Prefix, VIN, Suffix, "/", RequestId]).
+
 pseudo_clientid(DispatcherId) ->
-    iolist_to_binary(["sdv-fanout-dispatcher-", integer_to_binary(DispatcherId)]).
+    bin(["sdv-fanout-dispatcher-", integer_to_binary(DispatcherId)]).
+
+bin(Iolist) ->
+    iolist_to_binary(Iolist).

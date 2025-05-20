@@ -69,18 +69,12 @@ The dispatcher should call `emqx_cm:is_channel_connected/1` to check if the subs
 
 If there is already a message in flight, the `maybe_send` notification will be ignored.
 
-If there is no message in flight, the dispatcher will read the `sdv_fanout_ids` table to check if there is any message to be sent to the subscriber, if found, the dispatcher will send the message to the subscriber with QoS=1 topic = `agent/${VIN}/proxy/request/${request_id}`, monitor the subscriber process, and insert the sent message into the inflight table.
+If there is no message in flight, the dispatcher will read the `sdv_fanout_ids` table to check if there is any message to be sent to the subscriber, if found, the dispatcher will send the message to the subscriber with QoS=1 topic = `agent/${VIN}/proxy/request/${REQ_ID}`, monitor the subscriber process, and insert the sent message into the inflight table.
+
+Note, the topic prefix is configurable by the `topic_prefix` in the configuration.
 
 If a `'DOWN'` message is received from the subscriber, the dispatcher will remove the subscriber from the inflight table. The next `maybe_send` notification will be sent to the dispatcher pool after the vehicle reconnects and send heartbeat again.
 
 ## Security Considerations
 
 Topics matching `$SDV-FANOUT/#` should only be allowed by SDV platform fanout message publishers. ACL rules should be added to ensure this.
-
-## TODO
-
-- [ ] Garbage collection for the fanout ids and data.
-- [ ] Configuration for vehicle subscription topic pattern.
-- [ ] Check vehicle subscription existence before sending message.
-- [ ] CLI to inspect the fanout ids and data.
-- [ ] Batch VINs in RPC call twoards remote nodes.
