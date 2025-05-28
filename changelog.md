@@ -1,3 +1,7 @@
+# 0.4.1
+
+- Move wait for tables from spplication start callback to dispatcher process `handle_continue` so to prevent plugin app start timeout.
+
 # 0.4.0
 
 - Added CLI `emqx ctl sdv status` to inspect fanout status.
