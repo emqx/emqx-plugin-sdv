@@ -76,7 +76,7 @@ on_message_publish(
     } = Message
 ) ->
     Headers = Message#message.headers,
-    ok = emqx_sdv_fanout_data:insert_new(DataID, Payload, Ts),
+    ok = emqx_sdv_fanout_data:insert(DataID, Payload, Ts),
     {stop, Message#message{headers = Headers#{allow_publish => false}}};
 on_message_publish(#message{topic = <<?SDV_FANOUT_TRIGGER_TOPIC>>, payload = Payload} = Message) ->
     Headers = Message#message.headers,

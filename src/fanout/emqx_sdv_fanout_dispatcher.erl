@@ -204,7 +204,7 @@ start_link(Pool, Id) ->
 
 init([Pool, Id]) ->
     true = gproc_pool:connect_worker(Pool, {Pool, Id}),
-    {ok, #{pool => Pool, id => Id}}.
+    {ok, #{pool => Pool, id => Id}, {continue, wait_for_tables}}.
 
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
@@ -228,6 +228,10 @@ handle_cast(?ACKED(SubPid, RefKey, MRef), State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+handle_continue(wait_for_tables, State) ->
+    ok = emqx_sdv_fanout_data:wait_for_tables(),
+    ok = emqx_sdv_fanout_ids:wait_for_tables(),
+    {noreply, State};
 handle_continue(?MAYBE_SEND(Trigger, SubPid, VIN_Or_RefKey), #{id := Id} = State) ->
     %% continue to send the next message (if any)
     %% we cannot always start from VIN, because the dirty delete

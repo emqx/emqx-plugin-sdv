@@ -6,6 +6,7 @@
 
 -export([
     create_tables/0,
+    wait_for_tables/0,
     insert/4,
     next/1,
     delete/1,
@@ -28,6 +29,10 @@ create_tables() ->
         {record_name, ?ID_REC},
         {attributes, record_info(fields, ?ID_REC)}
     ]).
+
+%% @doc Wait for the tables to be created.
+wait_for_tables() ->
+    ok = mria:wait_for_tables([?ID_TAB]).
 
 %% @doc Insert an ID into the table.
 insert(VIN, Ts, RequestId, DataID) when
