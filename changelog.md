@@ -1,3 +1,7 @@
+# 0.4.3
+
+- Fix wait_for_table and wait_for_shard order.
+
 # 0.4.2
 
 - Non-blocking start of plugin app. Async wait for tables. Report unhealthy before tables are ready.
