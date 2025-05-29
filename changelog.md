@@ -1,3 +1,7 @@
+# 0.4.2
+
+- Non-blocking start of plugin app. Async wait for tables. Report unhealthy before tables are ready.
+
 # 0.4.1
 
 - Move wait for tables from spplication start callback to dispatcher process `handle_continue` so to prevent plugin app start timeout.

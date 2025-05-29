@@ -75,27 +75,43 @@ on_message_publish(
         timestamp = Ts, topic = <<?SDV_FANOUT_DATA_TOPIC, $/, DataID/binary>>, payload = Payload
     } = Message
 ) ->
-    Headers = Message#message.headers,
-    ok = emqx_sdv_fanout_data:insert(DataID, Payload, Ts),
-    {stop, Message#message{headers = Headers#{allow_publish => false}}};
+    case is_tables_ready() of
+        true ->
+            ok = emqx_sdv_fanout_data:insert(DataID, Payload, Ts),
+            {stop, disallow_publish(Message)};
+        false ->
+            ?LOG(error, "tables_not_ready_will_disconnect", #{topic => Message#message.topic}),
+            {stop, disconnect(Message)}
+    end;
 on_message_publish(#message{topic = <<?SDV_FANOUT_TRIGGER_TOPIC>>, payload = Payload} = Message) ->
-    Headers = Message#message.headers,
-    case emqx_sdv_fanout_dispatcher:trigger(Payload) of
-        ok ->
-            {stop, Message#message{headers = Headers#{allow_publish => false}}};
-        {error, Reason} ->
-            %% Fail loudly by disconnecting the client.
-            %% If SDV platform prefers to get a PUBACK with a reason code,
-            %% we can add a message header and here and use the header
-            %% in 'message.puback' hook callback.
-            ?LOG(error, "failed_to_handle_batch_will_disconnect", Reason),
-            {stop, Message#message{headers = Headers#{should_disconnect => true}}}
+    case is_tables_ready() of
+        true ->
+            case emqx_sdv_fanout_dispatcher:trigger(Payload) of
+                ok ->
+                    {stop, disallow_publish(Message)};
+                {error, Reason} ->
+                    %% Fail loudly by disconnecting the client.
+                    %% If SDV platform prefers to get a PUBACK with a reason code,
+                    %% we can add a message header and here and use the header
+                    %% in 'message.puback' hook callback.
+                    ?LOG(error, "failed_to_handle_batch_will_disconnect", Reason),
+                    {stop, disconnect(Message)}
+            end;
+        false ->
+            ?LOG(error, "tables_not_ready_will_disconnect", #{topic => Message#message.topic}),
+            {stop, disconnect(Message)}
     end;
 on_message_publish(#message{topic = <<"ecp/", Heartbeat/binary>>} = Message) ->
-    case emqx_topic:words(Heartbeat) of
-        [VIN, Event] when Event =:= <<"online">> orelse Event =:= <<"heartbeat">> ->
-            ok = emqx_sdv_fanout_dispatcher:heartbeat(VIN);
-        _ ->
+    case is_tables_ready() of
+        true ->
+            case emqx_topic:words(Heartbeat) of
+                [VIN, Event] when Event =:= <<"online">> orelse Event =:= <<"heartbeat">> ->
+                    ok = emqx_sdv_fanout_dispatcher:heartbeat(VIN);
+                _ ->
+                    ok
+            end;
+        false ->
+            ?LOG(debug, "tables_not_ready_will_ignore", #{topic => Message#message.topic}),
             ok
     end,
     {ok, Message};
@@ -106,11 +122,17 @@ on_message_publish(Message) ->
 %% @doc
 %% Called when PUBACK is received from the subscriber (vehicle).
 on_delivery_completed(#message{topic = Topic}, _) ->
-    case emqx_topic:words(Topic) of
-        [<<"agent">>, VIN, <<"proxy">>, <<"request">>, RequestId] ->
-            ok = emqx_sdv_fanout_dispatcher:ack(VIN, RequestId);
-        _ ->
-            %% Other topics, non of our business, just pass it on.
+    case is_tables_ready() of
+        true ->
+            case emqx_topic:words(Topic) of
+                [<<"agent">>, VIN, <<"proxy">>, <<"request">>, RequestId] ->
+                    ok = emqx_sdv_fanout_dispatcher:ack(VIN, RequestId);
+                _ ->
+                    %% Other topics, non of our business, just pass it on.
+                    ok
+            end;
+        false ->
+            ?LOG(debug, "tables_not_ready_will_ignore", #{topic => Topic}),
             ok
     end.
 
@@ -122,7 +144,12 @@ on_delivery_completed(#message{topic = Topic}, _) ->
 %% - Return `{error, Error}' if the health check fails.
 %% - Return `ok' if the health check passes.
 on_health_check(_Options) ->
-    ok.
+    case is_tables_ready() of
+        true ->
+            ok;
+        false ->
+            {error, tables_not_ready}
+    end.
 
 %% @doc
 %% - Return `{error, Error}' if the new config is invalid.
@@ -159,6 +186,7 @@ init([]) ->
     Config = emqx_plugin_helper:get_config(?PLUGIN_NAME_VSN),
     Parsed = emqx_sdv_config:parse(Config),
     emqx_sdv_config:put(Parsed),
+    self() ! wait_for_tables,
     {ok, Config}.
 
 handle_call(_Request, _From, State) ->
@@ -170,9 +198,25 @@ handle_cast({on_changed, _ParsedConfig}, State) ->
 handle_cast(_Request, State) ->
     {noreply, State}.
 
+handle_info(wait_for_tables, State) ->
+    ok = mria_rlog:wait_for_shards([?DB_SHARD], infinity),
+    ok = emqx_sdv_fanout_data:wait_for_tables(),
+    ok = emqx_sdv_fanout_ids:wait_for_tables(),
+    persistent_term:put({?MODULE, tables_ready}, true),
+    {noreply, State};
 handle_info(_Request, State) ->
     {noreply, State}.
 
 terminate(_Reason, _State) ->
     persistent_term:erase(?MODULE),
+    persistent_term:erase({?MODULE, tables_ready}),
     ok.
+
+is_tables_ready() ->
+    persistent_term:get({?MODULE, tables_ready}, false).
+
+disallow_publish(#message{headers = Headers} = Message) ->
+    Message#message{headers = Headers#{allow_publish => false}}.
+
+disconnect(#message{headers = Headers} = Message) ->
+    Message#message{headers = Headers#{should_disconnect => true}}.

@@ -37,7 +37,7 @@ create_tables() ->
         {attributes, record_info(fields, ?META_REC)}
     ]).
 
-%% @doc Wait for the tables to be loaded.
+%% @doc Wait for the tables to be created.
 wait_for_tables() ->
     ok = mria:wait_for_tables([?DATA_TAB, ?META_TAB]).
 

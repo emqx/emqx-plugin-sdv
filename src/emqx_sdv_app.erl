@@ -22,8 +22,6 @@
 
 start(_StartType, _StartArgs) ->
     create_tables(),
-    ok = mria_rlog:wait_for_shards([?DB_SHARD], infinity),
-    ok = mria:wait_for_tables([?ID_TAB, ?DATA_TAB]),
     {ok, Sup} = emqx_sdv_sup:start_link(),
     emqx_sdv:hook(),
     emqx_ctl:register_command(sdv, {emqx_sdv_cli, cmd}),
