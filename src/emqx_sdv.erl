@@ -199,9 +199,9 @@ handle_cast(_Request, State) ->
     {noreply, State}.
 
 handle_info(wait_for_tables, State) ->
-    ok = mria_rlog:wait_for_shards([?DB_SHARD], infinity),
     ok = emqx_sdv_fanout_data:wait_for_tables(),
     ok = emqx_sdv_fanout_ids:wait_for_tables(),
+    ok = mria_rlog:wait_for_shards([?DB_SHARD], infinity),
     persistent_term:put({?MODULE, tables_ready}, true),
     {noreply, State};
 handle_info(_Request, State) ->
