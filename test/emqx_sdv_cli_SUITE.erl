@@ -136,13 +136,18 @@ update_plugin_config(PluginConfig, CtConfig) ->
         {"Content-Type", "application/json"}
     ],
     Body = emqx_utils_json:encode(PluginConfig),
-    {ok, {{_, StatusCode, _}, _, _}} = httpc:request(
+    {ok, Resp} = httpc:request(
         put, {URL, Headers, "application/json", Body}, [], []
     ),
+    {{_, StatusCode, _}, _, _} = Resp,
     case StatusCode of
-        200 -> ok;
-        204 -> ok;
-        _ -> {error, StatusCode}
+        200 ->
+            ok;
+        204 ->
+            ok;
+        _ ->
+            ct:pal("Failed to update plugin config: ~p", [Resp]),
+            {error, StatusCode}
     end.
 
 get_status() ->

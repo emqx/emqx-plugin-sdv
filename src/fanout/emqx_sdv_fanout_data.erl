@@ -6,8 +6,9 @@
 
 -export([
     create_tables/0,
+    wait_for_tables/0,
     exists/1,
-    insert_new/3,
+    insert/3,
     read/1,
     gc/3
 ]).
@@ -36,9 +37,13 @@ create_tables() ->
         {attributes, record_info(fields, ?META_REC)}
     ]).
 
+%% @doc Wait for the tables to be created.
+wait_for_tables() ->
+    ok = mria:wait_for_tables([?DATA_TAB, ?META_TAB]).
+
 %% @doc Overwrite metadata if data exists, otherwise insert new data.
--spec insert_new(DataID :: binary(), Data :: binary(), Ts :: erlang:timestamp()) -> ok.
-insert_new(DataID, Data, Ts) ->
+-spec insert(DataID :: binary(), Data :: binary(), Ts :: erlang:timestamp()) -> ok.
+insert(DataID, Data, Ts) ->
     MetaRec = #?META_REC{data_id = DataID, meta = #{ts => Ts}},
     DataRec = #?DATA_REC{data_id = DataID, data = Data},
     case exists(DataID) of
