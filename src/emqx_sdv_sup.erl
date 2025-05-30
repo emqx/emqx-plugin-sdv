@@ -19,7 +19,7 @@ init([]) ->
     ok = emqx_sdv_fanout_inflight:create_tables(),
     SupFlags = #{
         strategy => one_for_all,
-        intensity => 1,
+        intensity => 10,
         period => 5
     },
     ConfigChildSpec = #{
