@@ -7,7 +7,7 @@
       "type": "int",
       "default": 0,
       "$ui": {
-        "component": "input",
+        "component": "input-number",
         "flex": 12,
         "required": false,
         "label": "$dispatcher_pool_size_label",
