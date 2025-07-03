@@ -1,3 +1,6 @@
+# 0.4.4
+- Release the plugin based on OTP 26
+
 # 0.4.3
 
 - Fix wait_for_table and wait_for_shard order.
