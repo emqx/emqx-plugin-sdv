@@ -1,4 +1,9 @@
+# 0.4.5
+
+- Fix a UI style hint: for pool size config, it should be integer input.
+
 # 0.4.4
+
 - Release the plugin based on OTP 26
 
 # 0.4.3
