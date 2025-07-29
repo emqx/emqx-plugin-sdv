@@ -1,3 +1,8 @@
+# 0.4.6
+
+- Fix handling of a race condition after vehicle client reconnects.
+- Add a safety guard for dispatcher pool restart caused inflight table leak.
+
 # 0.4.5
 
 - Fix a UI style hint: for pool size config, it should be integer input.

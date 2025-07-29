@@ -16,11 +16,18 @@ start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 init([]) ->
-    ok = emqx_sdv_fanout_inflight:create_tables(),
     SupFlags = #{
         strategy => one_for_all,
         intensity => 10,
         period => 5
+    },
+    InflightTableOwner = #{
+        id => emqx_sdv_fanout_inflight,
+        start => {emqx_sdv_fanout_inflight, start_link, []},
+        restart => permanent,
+        shutdown => 5000,
+        type => worker,
+        modules => [emqx_sdv_fanout_inflight]
     },
     ConfigChildSpec = #{
         id => emqx_sdv,
@@ -48,9 +55,9 @@ init([]) ->
     Children =
         case mria_config:whoami() of
             core ->
-                [ConfigChildSpec, PoolSupSpec, GcChildSpec];
+                [ConfigChildSpec, InflightTableOwner, PoolSupSpec, GcChildSpec];
             _ ->
-                [ConfigChildSpec, PoolSupSpec]
+                [ConfigChildSpec, InflightTableOwner, PoolSupSpec]
         end,
     {ok, {SupFlags, Children}}.
 
