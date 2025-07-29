@@ -12,6 +12,17 @@
     exists/1
 ]).
 
+-export([
+    start_link/0,
+    stop/0,
+    init/1,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    terminate/2,
+    code_change/3
+]).
+
 -include("emqx_sdv.hrl").
 
 %% @doc Create the tables.
@@ -59,3 +70,52 @@ lookup(SubPid) ->
         [] ->
             {error, not_found}
     end.
+
+%% @doc Start the inflight table owner process.
+start_link() ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
+%% @doc Stop the inflight table owner process.
+stop() ->
+    gen_server:stop(?MODULE).
+
+%% @private
+init([]) ->
+    process_flag(trap_exit, true),
+    ok = create_tables(),
+    {ok, #{}}.
+
+%% @private
+handle_call(_Request, _From, State) ->
+    {reply, ok, State}.
+
+%% @private
+handle_cast(_Msg, State) ->
+    {noreply, State}.
+
+%% @private
+handle_info({'EXIT', DispatchPid, _Reason}, State) ->
+    %% Clean up inflight records for the dead dispatcher process
+    ets:foldl(
+        fun(#?INFLIGHT_REC{sub_pid = SubPid, dispatch_pid = DPid}, _Acc) ->
+            case DPid =:= DispatchPid of
+                true ->
+                    ets:delete(?INFLIGHT_TAB, SubPid);
+                false ->
+                    ok
+            end
+        end,
+        ok,
+        ?INFLIGHT_TAB
+    ),
+    {noreply, State};
+handle_info(_Info, State) ->
+    {noreply, State}.
+
+%% @private
+terminate(_Reason, _State) ->
+    ok.
+
+%% @private
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.

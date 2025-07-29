@@ -204,6 +204,9 @@ start_link(Pool, Id) ->
 
 init([Pool, Id]) ->
     true = gproc_pool:connect_worker(Pool, {Pool, Id}),
+    %% link to the inflight table owner process, so if the dispatcher is restarted,
+    %% the inflight table owner process will delete the inflight records inserted by this dispatcher
+    true = erlang:link(whereis(emqx_sdv_fanout_inflight)),
     {ok, #{pool => Pool, id => Id}}.
 
 handle_call(_Request, _From, State) ->
