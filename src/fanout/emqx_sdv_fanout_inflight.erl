@@ -6,7 +6,7 @@
 
 -export([
     create_tables/0,
-    insert/3,
+    insert/4,
     delete/1,
     lookup/1,
     exists/1
@@ -20,33 +20,42 @@ create_tables() ->
         public,
         named_table,
         set,
-        {keypos, #?INFLIGHT_REC.pid},
+        {keypos, #?INFLIGHT_REC.sub_pid},
         {write_concurrency, true},
         {read_concurrency, true}
     ]),
     ok.
 
 %% @doc Insert a new inflight record.
--spec insert(Pid :: pid(), RefKey :: ref_key(), MRef :: reference()) -> ok.
-insert(Pid, RefKey, MRef) ->
-    ets:insert(?INFLIGHT_TAB, #?INFLIGHT_REC{pid = Pid, ref = RefKey, mref = MRef}),
+-spec insert(
+    SubPid :: pid(), RefKey :: ref_key(), DispatchPid :: pid(), DispatchMRef :: reference()
+) -> ok.
+insert(SubPid, RefKey, DispatchPid, DispatchMRef) ->
+    ets:insert(?INFLIGHT_TAB, #?INFLIGHT_REC{
+        sub_pid = SubPid,
+        ref = RefKey,
+        dispatch_pid = DispatchPid,
+        dispatch_mref = DispatchMRef
+    }),
     ok.
 
 %% @doc Delete an inflight record.
--spec delete(Pid :: pid()) -> ok.
-delete(Pid) ->
-    ets:delete(?INFLIGHT_TAB, Pid),
+-spec delete(SubPid :: pid()) -> ok.
+delete(SubPid) ->
+    ets:delete(?INFLIGHT_TAB, SubPid),
     ok.
 
 %% @doc Return 'true' if the pid has an inflight record.
--spec exists(Pid :: pid()) -> boolean().
-exists(Pid) ->
-    ets:member(?INFLIGHT_TAB, Pid).
+-spec exists(SubPid :: pid()) -> boolean().
+exists(SubPid) ->
+    ets:member(?INFLIGHT_TAB, SubPid).
 
 %% @doc Lookup the inflight record by the pid.
--spec lookup(Pid :: pid()) -> {ok, ref_key(), reference()} | {error, not_found}.
-lookup(Pid) ->
-    case ets:lookup(?INFLIGHT_TAB, Pid) of
-        [#?INFLIGHT_REC{ref = RefKey, mref = MRef}] -> {ok, RefKey, MRef};
-        [] -> {error, not_found}
+-spec lookup(SubPid :: pid()) -> {ok, ref_key(), reference()} | {error, not_found}.
+lookup(SubPid) ->
+    case ets:lookup(?INFLIGHT_TAB, SubPid) of
+        [#?INFLIGHT_REC{ref = RefKey, dispatch_pid = DispatchPid, dispatch_mref = DispatchMRef}] ->
+            {ok, RefKey, DispatchPid, DispatchMRef};
+        [] ->
+            {error, not_found}
     end.
