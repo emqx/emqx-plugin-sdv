@@ -45,6 +45,6 @@ t_no_leak(_Config) ->
     end,
     %% Make a random synced call to ensure the EXIT message is processed
     _ = gen_server:call(emqx_sdv_fanout_inflight, foobar, infinity),
-    ?assertNot(emqx_sdv_fanout_inflight:exists(self())),
+    ?assertNot(emqx_sdv_fanout_inflight:exists(Pid)),
     ok = emqx_sdv_fanout_inflight:stop(),
     ok.
