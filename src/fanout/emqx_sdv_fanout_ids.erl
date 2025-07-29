@@ -10,6 +10,7 @@
     insert/4,
     next/1,
     delete/1,
+    delete_by_vin/1,
     gc/3
 ]).
 
@@ -64,6 +65,15 @@ next(?REF_KEY(VIN, _Ts, _RequestId) = RefKey) ->
 delete(RefKey) ->
     mria:dirty_delete(?ID_TAB, RefKey),
     ok.
+
+%% @doc Delete the first (and only) ID for a VIN.
+delete_by_vin(VIN) ->
+    case mnesia:dirty_next(?ID_TAB, pseudo_prev(VIN)) of
+        ?REF_KEY(VIN1, _Ts, _RequestId) = RefKey when VIN1 =:= VIN ->
+            delete(RefKey);
+        _ ->
+            ok
+    end.
 
 %% A pseudo previous key for the given VIN.
 %% Next is guaranteed to be the first key of the given VIN.

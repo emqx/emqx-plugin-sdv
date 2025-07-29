@@ -108,6 +108,38 @@ t_disconnected_session_does_not_receive_dispatch(_Config) ->
         ok = stop_client(PubPid)
     end.
 
+%% The vehicle client crashes after receiving the first message,
+%% then reconnects and process the redelivered message normally.
+t_reconnect_after_disconnect(_Config) ->
+    UniqueId = erlang:system_time(millisecond),
+    VIN = vin(UniqueId, 1),
+    {ok, PubPid} = start_batch_publisher(),
+    try
+        {ok, {RequestId, Data}} = publish_batch(PubPid, [VIN]),
+        Opts = [{clean_start, false}, {properties, #{'Session-Expiry-Interval' => 5}}],
+        {ok, SubPid1, Mref1} = start_reconnect_vehicle_client(VIN, true, Opts),
+        HeartbeatPid = send_heartbeats([{VIN, SubPid1}]),
+        receive
+            {'DOWN', Mref1, process, SubPid1, _Reason} ->
+                ok
+        after 5000 ->
+            ct:fail(#{reason => "client is not down as expected"})
+        end,
+        HeartbeatPid ! stop,
+        {ok, SubPid2, _Mref2} = start_reconnect_vehicle_client(VIN, false, Opts),
+        %% Expect the message to be redelivered without any trigger,
+        %% because the last session terminated before PUBACK is sent.
+        receive
+            {publish_received, SubPid2, VIN, Msg} ->
+                ?assertEqual(Data, maps:get(payload, Msg))
+        after 5000 ->
+            ct:fail(#{reason => "client did not receive the message as expected"})
+        end,
+        ok = stop_client(SubPid2)
+    after
+        ok = stop_client(PubPid)
+    end.
+
 t_non_json_payload_causes_disconnect(_Config) ->
     test_invalid_trigger_payload(<<"not json">>).
 
@@ -200,6 +232,31 @@ start_vehicle_clients(VINs, Opts) ->
         {ok, []},
         VINs
     ).
+
+start_reconnect_vehicle_client(VIN, ShouldDisconnect, Opts) ->
+    Owner = self(),
+    MsgHandler = #{
+        publish => fun(Msg) ->
+            ct:pal("publish received from EMQX: ~p", [Msg]),
+            case ShouldDisconnect of
+                true ->
+                    exit(self(), kill);
+                false ->
+                    Owner ! {publish_received, self(), VIN, Msg}
+            end
+        end
+    },
+    {ok, Pid} = emqtt:start_link(
+        [
+            {clientid, VIN}, {proto_ver, v5}, {msg_handler, MsgHandler}
+        ] ++ Opts
+    ),
+    {ok, _} = emqtt:connect(Pid),
+    Mref = monitor(process, Pid),
+    unlink(Pid),
+    QoS = 1,
+    {ok, _, _} = emqtt:subscribe(Pid, sub_topic(VIN), QoS),
+    {ok, Pid, Mref}.
 
 sub_topic(VIN) ->
     bin(["agent/", VIN, "/proxy/request/+"]).

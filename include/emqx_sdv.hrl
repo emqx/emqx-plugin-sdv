@@ -43,9 +43,10 @@
 }).
 
 -record(?INFLIGHT_REC, {
-    pid :: pid(),
+    sub_pid :: pid(),
     ref :: ref_key(),
-    mref :: reference()
+    dispatch_pid :: pid(),
+    dispatch_mref :: reference()
 }).
 
 -define(DB_SHARD, sdv_shard).

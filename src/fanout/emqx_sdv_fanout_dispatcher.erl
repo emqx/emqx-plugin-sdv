@@ -38,24 +38,24 @@ trigger(Payload) ->
     end.
 
 %% @doc Handle an ACK received from a vehicle.
-ack(VIN, RequestId) ->
-    case emqx_sdv_fanout_inflight:lookup(self()) of
-        {ok, RefKey, MRef} ->
+ack(VIN, _RequestId) ->
+    SubPid = self(),
+    case emqx_sdv_fanout_inflight:lookup(SubPid) of
+        {ok, RefKey, DispatchPid, DispatchMRef} ->
+            ?LOG(debug, "ack_received", #{vin => VIN, sub_pid => SubPid}),
             %% do the heavy lifting in the client process
             %% because mria:dirty_delete/2 may involve RPC
             %% to core nodes if running in a replica node
             ok = emqx_sdv_fanout_ids:delete(RefKey),
-            %% find the dispatcher for the VIN and tell it to send the next message
-            Dispatcher = gproc_pool:pick_worker(?DISPATCHER_POOL, VIN),
-            gen_server:cast(Dispatcher, ?ACKED(self(), RefKey, MRef));
+            gen_server:cast(DispatchPid, ?ACKED(SubPid, RefKey, DispatchMRef));
         {error, not_found} ->
-            %% half-transmitted QoS 1 was retried, ignore for now, fix until someone screams
-            %% TODO: scan the ids table for the VIN + RequestId and delete it
-            ?LOG(warning, "acked_unknown_request_id", #{
-                vin => VIN,
-                request_id => RequestId
-            }),
-            ok
+            ?LOG(info, "inflight_not_found", #{vin => VIN, sub_pid => SubPid}),
+            %% Race-condition:
+            %% QoS-1 message delivered from session state after resume
+            %% The inflight state is lost for the old process.
+            ok = emqx_sdv_fanout_ids:delete_by_vin(VIN),
+            Dispatcher = gproc_pool:pick_worker(?DISPATCHER_POOL, VIN),
+            gen_server:cast(Dispatcher, ?MAYBE_SEND(?TRG_ACKED, SubPid, VIN))
     end.
 
 %% @doc Handle a heartbeat from a vehicle.
@@ -236,7 +236,7 @@ handle_continue(?MAYBE_SEND(Trigger, SubPid, VIN_Or_RefKey), #{id := Id} = State
     case maybe_send(Trigger, SubPid, VIN_Or_RefKey, Id) of
         {ok, RefKey} ->
             MRef = erlang:monitor(process, SubPid),
-            emqx_sdv_fanout_inflight:insert(SubPid, RefKey, MRef);
+            emqx_sdv_fanout_inflight:insert(SubPid, RefKey, self(), MRef);
         ignore ->
             ok
     end,
