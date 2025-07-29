@@ -63,4 +63,4 @@ fmt-check: $(REBAR)
 
 .PHONY: run
 run: rel
-	./scripts/run.sh emqx/emqx-enterprise:5.9.0
+	./scripts/run.sh emqx/emqx-enterprise:5.9.1
