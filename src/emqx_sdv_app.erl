@@ -15,7 +15,8 @@
 
 -export([
     on_config_changed/2,
-    on_health_check/1
+    on_health_check/1,
+    on_handle_api_call/4
 ]).
 
 -include("emqx_sdv.hrl").
@@ -37,7 +38,34 @@ on_config_changed(OldConfig, NewConfig) ->
 on_health_check(Options) ->
     emqx_sdv:on_health_check(Options).
 
+on_handle_api_call(Method, PathRemainder, Request, Context) ->
+    log_api_callback(Method, PathRemainder, Request, Context),
+    {ok, 200, #{}, #{code => <<"NOT_IMPLEMENTED">>, message => <<"Demo API callback">>}}.
+
 create_tables() ->
     ok = emqx_sdv_fanout_data:create_tables(),
     ok = emqx_sdv_fanout_ids:create_tables(),
     ok.
+
+log_api_callback(Method, PathRemainder, Request, Context) when
+    Method =:= get;
+    Method =:= post;
+    Method =:= put;
+    Method =:= patch;
+    Method =:= delete;
+    Method =:= head;
+    Method =:= options
+->
+    ?LOG(warning, "demo_api_callback_invoked", #{
+        method => Method,
+        path => PathRemainder,
+        request => Request,
+        context => Context
+    });
+log_api_callback(Method, PathRemainder, Request, Context) ->
+    ?LOG(warning, "demo_api_callback_invoked_unknown_method", #{
+        method => Method,
+        path => PathRemainder,
+        request => Request,
+        context => Context
+    }).
