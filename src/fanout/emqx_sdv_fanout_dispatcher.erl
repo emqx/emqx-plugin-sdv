@@ -60,13 +60,10 @@ ack(VIN, _RequestId) ->
 
 %% @doc Handle a heartbeat from a vehicle.
 heartbeat(VIN) ->
-    %% check if the VIN has any messages inflight or pending to be sent in the client process
-    %% so to minimize the number or message passing to the dispatcher pool
-    case emqx_sdv_fanout_inflight:exists(self()) of
+    SubPid = self(),
+    case is_busy(VIN, SubPid) of
         true ->
-            %% there are inflight messages, do not notify the dispatcher
-            %% because the client process will do it when the inflight messages are acknowledged
-            ?LOG(debug, "inflight_messages_detected", #{
+            ?LOG(debug, "heartbeat_ignored_session_pending", #{
                 vin => VIN,
                 trigger => ?TRG_HEARTBEAT
             }),
@@ -77,7 +74,6 @@ heartbeat(VIN) ->
                     %% this is called by the vehicle client process itself,
                     %% so it's for sure online, directly notify the dispatcher
                     Dispatcher = gproc_pool:pick_worker(?DISPATCHER_POOL, VIN),
-                    SubPid = self(),
                     gen_server:cast(Dispatcher, ?MAYBE_SEND(?TRG_HEARTBEAT, SubPid, VIN));
                 {error, empty} ->
                     %% ignore if the VIN has no inflight messages
@@ -87,6 +83,38 @@ heartbeat(VIN) ->
                     }),
                     ok
             end
+    end.
+
+%% @private
+%% Returns 'true' if a heartbeat-triggered dispatch should be skipped,
+%% because either:
+%% 1) the plugin's inflight ETS already tracks a message for this SubPid, or
+%% 2) the MQTT session itself still has something inflight or queued.
+%%
+%% (2) catches the non-clean-session takeover race: the old SubPid's
+%% inflight row is removed on DOWN, leaving (1) blind to the message
+%% the session is about to redeliver. The check reads emqx's cached
+%% channel-stats; the cache is freshly populated on the post-CONNACK
+%% 'connected' event with the inherited inflight, so the takeover
+%% window is covered. We deliberately limit this extra check to the
+%% heartbeat path so the stats-timer cache lag (typical 15-30s after
+%% PUBACK) does not delay ack-driven or new-batch dispatches.
+is_busy(VIN, SubPid) ->
+    emqx_sdv_fanout_inflight:exists(SubPid) orelse
+        (not session_inflight_and_mqueue_empty(VIN, SubPid)).
+
+%% @private
+%% Read inflight_cnt + mqueue_len from emqx's cached channel-info ETS.
+%% Returns true only if both are 0. Missing row → false (safer to
+%% briefly over-skip than to redispatch).
+session_inflight_and_mqueue_empty(VIN, Pid) ->
+    case ets:lookup(emqx_channel_info, {VIN, Pid}) of
+        [{_, _Info, Stats}] when is_list(Stats) ->
+            InflightCnt = proplists:get_value(inflight_cnt, Stats, 0),
+            MqueueLen = proplists:get_value(mqueue_len, Stats, 0),
+            (InflightCnt + MqueueLen) =:= 0;
+        _ ->
+            false
     end.
 
 insert_ids(VINs, RequestId, DataID) ->

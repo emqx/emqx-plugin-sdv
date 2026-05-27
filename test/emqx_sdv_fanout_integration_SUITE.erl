@@ -140,6 +140,71 @@ t_reconnect_after_disconnect(_Config) ->
         ok = stop_client(PubPid)
     end.
 
+%% Reproduce the non-clean-session takeover race: a QoS-1 fanout message is
+%% delivered to a vehicle that disconnects abruptly before sending PUBACK.
+%% The session retains the inflight message; the next client connection
+%% triggers a DUP=1 redelivery. The vehicle then publishes a heartbeat,
+%% which used to make the plugin dispatch the same message a second time
+%% because the plugin's inflight ETS was cleaned up on the old SubPid's
+%% DOWN. The fix in heartbeat/1 consults emqx's cached session stats and
+%% suppresses the redispatch. This test asserts that the second connection
+%% receives exactly one PUBLISH on the subscription, not two.
+t_resume_does_not_redispatch(_Config) ->
+    VIN = vin(erlang:system_time(millisecond), 1),
+    {ok, PubPid} = start_batch_publisher(),
+    try
+        Owner = self(),
+        Opts1 = [
+            {clean_start, false},
+            {auto_ack, never},
+            {properties, #{'Session-Expiry-Interval' => 30}}
+        ],
+        {ok, Sub1} = start_held_vehicle_client(VIN, Owner, Opts1),
+        Data =
+            try
+                {ok, {_RequestId, D}} = publish_batch(PubPid, [VIN]),
+                %% First delivery — captured but not PUBACKed.
+                #{payload := P1, dup := false} = receive_publish(Sub1, VIN, 5000),
+                ?assertEqual(D, P1),
+                D
+            after
+                ok = abrupt_disconnect(Sub1)
+            end,
+        %% Give the broker a moment to register the disconnection and
+        %% release the old channel pid; otherwise the reconnect can race.
+        timer:sleep(200),
+        Opts2 = [
+            {clean_start, false},
+            %% Hold the PUBACK on the redelivered (DUP=1) message: the race
+            %% window only exists while M1 is still inflight in the session.
+            %% Auto-acking would clear the session inflight before our
+            %% heartbeat reaches the plugin and the race would not fire.
+            {auto_ack, never},
+            {properties, #{'Session-Expiry-Interval' => 30}}
+        ],
+        {ok, Sub2} = start_held_vehicle_client(VIN, Owner, Opts2),
+        try
+            ?assertEqual(1, session_present(Sub2)),
+            %% Expect the DUP=1 redelivery first.
+            #{payload := P2, dup := true, packet_id := PktId} =
+                receive_publish(Sub2, VIN, 5000),
+            ?assertEqual(Data, P2),
+            %% Now publish a heartbeat. Before the fix, this triggers a
+            %% second dispatch of the same fanout message.
+            {ok, _} = emqtt:publish(
+                Sub2, bin([<<"ecp/">>, VIN, <<"/heartbeat">>]), <<>>, 1
+            ),
+            assert_no_publish(VIN, 1500),
+            %% Clean up: PUBACK the held redelivery so the session can
+            %% drain naturally rather than relying on the expiry timer.
+            ok = emqtt:puback(Sub2, PktId)
+        after
+            ok = stop_client(Sub2)
+        end
+    after
+        ok = stop_client(PubPid)
+    end.
+
 t_non_json_payload_causes_disconnect(_Config) ->
     test_invalid_trigger_payload(<<"not json">>).
 
@@ -183,18 +248,26 @@ assert_payload_received(SubPids, RequestId, Data) ->
     assert_payload_received(Remain, RequestId, Data).
 
 start_batch_publisher() ->
+    {Host, Port} = mqtt_endpoint(),
     {ok, Pid} = emqtt:start_link([
-        {host, mqtt_endpoint()}, {clientid, <<"sdv-batch-publisher">>}, {proto_ver, v5}
+        {host, Host}, {port, Port}, {clientid, <<"sdv-batch-publisher">>}, {proto_ver, v5}
     ]),
     {ok, _} = emqtt:connect(Pid),
     {ok, Pid}.
 
+%% Returns {Host, Port}. Accepts EMQX_MQTT_ENDPOINT as either "host" or
+%% "host:port"; defaults to {"127.0.0.1", 1883}.
 mqtt_endpoint() ->
     case os:getenv("EMQX_MQTT_ENDPOINT") of
         false ->
-            "127.0.0.1";
+            {"127.0.0.1", 1883};
         Endpoint ->
-            Endpoint
+            case string:split(Endpoint, ":") of
+                [Host, PortStr] ->
+                    {Host, list_to_integer(PortStr)};
+                [Host] ->
+                    {Host, 1883}
+            end
     end.
 
 publish_batch(Pid, VINs) ->
@@ -216,12 +289,17 @@ start_vehicle_clients(VINs) ->
 
 start_vehicle_clients(VINs, Opts) ->
     Owner = self(),
+    {Host, Port} = mqtt_endpoint(),
     lists:foldl(
         fun(VIN, {ok, Pids}) ->
             MsgHandler = #{publish => fun(Msg) -> Owner ! {publish_received, self(), VIN, Msg} end},
             {ok, Pid} = emqtt:start_link(
                 [
-                    {clientid, VIN}, {proto_ver, v5}, {msg_handler, MsgHandler}
+                    {host, Host},
+                    {port, Port},
+                    {clientid, VIN},
+                    {proto_ver, v5},
+                    {msg_handler, MsgHandler}
                 ] ++ Opts
             ),
             {ok, _} = emqtt:connect(Pid),
@@ -235,6 +313,7 @@ start_vehicle_clients(VINs, Opts) ->
 
 start_reconnect_vehicle_client(VIN, ShouldDisconnect, Opts) ->
     Owner = self(),
+    {Host, Port} = mqtt_endpoint(),
     MsgHandler = #{
         publish => fun(Msg) ->
             ct:pal("publish received from EMQX: ~p", [Msg]),
@@ -248,7 +327,11 @@ start_reconnect_vehicle_client(VIN, ShouldDisconnect, Opts) ->
     },
     {ok, Pid} = emqtt:start_link(
         [
-            {clientid, VIN}, {proto_ver, v5}, {msg_handler, MsgHandler}
+            {host, Host},
+            {port, Port},
+            {clientid, VIN},
+            {proto_ver, v5},
+            {msg_handler, MsgHandler}
         ] ++ Opts
     ),
     {ok, _} = emqtt:connect(Pid),
@@ -317,3 +400,70 @@ assert_session_persisted(SubPids) ->
         end,
         SubPids
     ).
+
+%% Like start_vehicle_clients/2 but for a single VIN. Forwards every PUBLISH
+%% to Owner as `{publish_received, SubPid, VIN, Msg}'. The caller is
+%% responsible for any PUBACK; combine with `{auto_ack, never}' in Opts to
+%% hold messages inflight in the broker session.
+start_held_vehicle_client(VIN, Owner, Opts) ->
+    {Host, Port} = mqtt_endpoint(),
+    MsgHandler = #{
+        publish => fun(Msg) -> Owner ! {publish_received, self(), VIN, Msg} end
+    },
+    {ok, Pid} = emqtt:start_link(
+        [
+            {host, Host},
+            {port, Port},
+            {clientid, VIN},
+            {proto_ver, v5},
+            {msg_handler, MsgHandler}
+        ] ++ Opts
+    ),
+    {ok, _} = emqtt:connect(Pid),
+    QoS = 1,
+    {ok, _, _} = emqtt:subscribe(Pid, sub_topic(VIN), QoS),
+    {ok, Pid}.
+
+%% Wait for a single PUBLISH from VIN routed through the client process.
+receive_publish(SubPid, VIN, TimeoutMs) ->
+    receive
+        {publish_received, SubPid, VIN, Msg} ->
+            Msg
+    after TimeoutMs ->
+        ct:fail(#{
+            reason => publish_not_received,
+            sub_pid => SubPid,
+            vin => VIN
+        })
+    end.
+
+%% Assert no PUBLISH arrives for this VIN within the window.
+assert_no_publish(VIN, TimeoutMs) ->
+    receive
+        {publish_received, _, VIN, Msg} ->
+            ct:fail(#{
+                reason => unexpected_duplicate_publish,
+                vin => VIN,
+                msg => Msg
+            })
+    after TimeoutMs ->
+        ok
+    end.
+
+%% Tear down a client without sending DISCONNECT, so the broker treats it
+%% as an abrupt network drop and the session is preserved for resume.
+abrupt_disconnect(Pid) ->
+    unlink(Pid),
+    %% kill bypasses emqtt's graceful shutdown path; no MQTT DISCONNECT
+    %% is sent before the socket closes.
+    exit(Pid, kill),
+    receive
+        {'EXIT', Pid, _} -> ok
+    after 0 -> ok
+    end,
+    ok.
+
+session_present(Pid) ->
+    Info = emqtt:info(Pid),
+    InfoMap = maps:from_list(Info),
+    maps:get(session_present, InfoMap).
