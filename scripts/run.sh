@@ -9,7 +9,9 @@ cd -P -- "$(dirname -- "$0")/../"
 
 PLUGIN_VSN="$(grep -o 'plugin_rel_vsn, "[^"]*"' rebar.config | cut -d'"' -f2)"
 
-HAPROXY_PORTS=(-p 18083:18083 -p 1883:1883)
+HOST_MQTT_PORT="${HOST_MQTT_PORT:-1883}"
+HOST_DASHBOARD_PORT="${HOST_DASHBOARD_PORT:-18083}"
+HAPROXY_PORTS=(-p "${HOST_DASHBOARD_PORT}:18083" -p "${HOST_MQTT_PORT}:1883")
 
 NET='emqx.io'
 NODE1="node1.$NET"
@@ -220,6 +222,43 @@ validate_plugin "$NODE1"
 validate_plugin "$NODE2"
 validate_plugin "$NODE3"
 echo "Plugin emqx_sdv-${PLUGIN_VSN} is running in all nodes."
+
+# Verify host-side reachability of the published HAProxy ports.
+# 'make run' historically reported success even when HAProxy never
+# bound on the host, so CT failed immediately with econnrefused; this
+# loop turns that into a loud, diagnosable failure here instead.
+dump_container_state() {
+    echo "===== docker ps -a ====="
+    docker ps -a
+    for c in haproxy "$NODE1" "$NODE2" "$NODE3"; do
+        echo "===== docker logs $c (last 80 lines) ====="
+        docker logs --tail 80 "$c" 2>&1 || true
+    done
+}
+
+wait_for_host_port() {
+    local port="$1"
+    local label="$2"
+    local wait_limit="${3:-30}"
+    local wait_sec=0
+    printf "Waiting for host 127.0.0.1:%s (%s) " "$port" "$label"
+    while ! (exec 3<>/dev/tcp/127.0.0.1/"$port") 2>/dev/null; do
+        if [ "$wait_sec" -ge "$wait_limit" ]; then
+            echo
+            echo "Error: 127.0.0.1:$port ($label) is not reachable after ${wait_limit}s"
+            dump_container_state
+            exit 1
+        fi
+        printf .
+        sleep 1
+        wait_sec=$((wait_sec + 1))
+    done
+    exec 3<&- 3>&-
+    echo " ok"
+}
+
+wait_for_host_port "$HOST_MQTT_PORT" "MQTT via HAProxy" 30
+wait_for_host_port "$HOST_DASHBOARD_PORT" "Dashboard via HAProxy" 30
 
 cmd() {
     docker exec node1.emqx.io emqx ctl sdv $@
