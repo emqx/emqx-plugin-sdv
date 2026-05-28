@@ -104,16 +104,17 @@ is_busy(VIN, SubPid) ->
         (not session_inflight_and_mqueue_empty(VIN, SubPid)).
 
 %% @private
-%% Read inflight_cnt + mqueue_len from emqx's cached channel-info ETS.
-%% Returns true only if both are 0. Missing row → false (safer to
-%% briefly over-skip than to redispatch).
+%% Read inflight_cnt + mqueue_len from emqx's cached channel-info ETS
+%% via emqx_cm's local-only accessor. Returns true only if both are 0.
+%% Missing row (`undefined') → false (safer to briefly over-skip than
+%% to redispatch).
 session_inflight_and_mqueue_empty(VIN, Pid) ->
-    case ets:lookup(emqx_channel_info, {VIN, Pid}) of
-        [{_, _Info, Stats}] when is_list(Stats) ->
+    case emqx_cm:do_get_chan_stats(VIN, Pid) of
+        Stats when is_list(Stats) ->
             InflightCnt = proplists:get_value(inflight_cnt, Stats, 0),
             MqueueLen = proplists:get_value(mqueue_len, Stats, 0),
             (InflightCnt + MqueueLen) =:= 0;
-        _ ->
+        undefined ->
             false
     end.
 
