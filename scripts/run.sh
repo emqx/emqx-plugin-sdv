@@ -95,8 +95,10 @@ mkdir -p tmp
 cat <<EOF > tmp/haproxy.cfg
 global
     log stdout format raw daemon debug
-    # Replace 1024000 with deployment connections
-    maxconn 102400
+    # Keep maxconn well below the container's FD soft limit (65536 on
+    # GitHub Actions runners). HAProxy needs ~2 FDs per connection plus
+    # listeners, so 10000 maxconn → ~20k FDs, comfortably under 65536.
+    maxconn 10000
     nbproc 1
     nbthread 2
     cpu-map auto:1/1-2 0-1
@@ -107,8 +109,7 @@ defaults
     log global
     mode tcp
     option tcplog
-    # Replace 1024000 with deployment connections
-    maxconn 102400
+    maxconn 10000
     timeout connect 30000
     timeout client 600s
     timeout server 600s
