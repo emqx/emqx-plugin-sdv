@@ -1,3 +1,7 @@
+# 0.4.7
+
+- Fix race-condition caused redispatch of fanout message after session takeover.
+
 # 0.4.6
 
 - Fix handling of a race condition after vehicle client reconnects.
